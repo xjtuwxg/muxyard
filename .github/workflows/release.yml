@@ -90,6 +90,14 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-failures-${{ matrix.platform }}-${{ matrix.arch }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   draft-release:
     if: github.event_name == 'push' && github.ref_type == 'tag'

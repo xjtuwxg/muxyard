@@ -28,7 +28,22 @@ async function launch(data: string): Promise<ElectronApplication> {
     await app.close()
     throw new Error(`Refusing to run UI tests without an isolated user-data directory: ${userData}`)
   }
+  // Manually launched Electron contexts do not inherit Playwright's use.viewport setting.
+  // Hosted macOS desktops can be smaller than the requested BrowserWindow size.
+  const page = await app.firstWindow()
+  await page.setViewportSize({ width: 1480, height: 940 })
   return app
+}
+
+async function captureFailure(app: ElectronApplication | undefined): Promise<void> {
+  const page = app?.windows().find((window) => !window.isClosed())
+  if (!page) return
+  try {
+    await test.info().attach('desktop-failure', {
+      body: await page.screenshot(),
+      contentType: 'image/png'
+    })
+  } catch {}
 }
 
 test('desktop demo supports session attachment, pane navigation, search and detach', async () => {
@@ -65,6 +80,9 @@ test('desktop demo supports session attachment, pane navigation, search and deta
     ).toBeDisabled()
     await page.getByRole('button', { name: 'Close dialog' }).click()
     expect(errors).toEqual([])
+  } catch (error) {
+    await captureFailure(app)
+    throw error
   } finally {
     await app?.close()
     await rm(data, { recursive: true, force: true })
@@ -154,6 +172,9 @@ test('desktop connects to a real isolated tmux session and keeps it after detach
     await expect(page.locator('.pane-workspace')).toHaveCount(0)
     await expect.poll(() => tmux(['display-message', '-p', '#{session_attached}']).trim()).toBe('0')
     expect(tmux(['list-sessions'])).toContain('ui-existing')
+  } catch (error) {
+    await captureFailure(app)
+    throw error
   } finally {
     await app?.close()
     tmux(['kill-server'])
@@ -328,6 +349,9 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
       tmux(['list-windows', '-t', 'ui-windows', '-F', '#{window_id}']).trim().split('\n')
     ).toHaveLength(6)
     expect(errors).toEqual([])
+  } catch (error) {
+    await captureFailure(app)
+    throw error
   } finally {
     await app?.close()
     tmux(['kill-server'])
@@ -407,6 +431,9 @@ test('SSH import previews aliases without connecting, checks on demand, and impo
         )
       )
       .toBe(true)
+  } catch (error) {
+    await captureFailure(app)
+    throw error
   } finally {
     await app?.close()
     await rm(data, { recursive: true, force: true })
@@ -476,6 +503,9 @@ test('creates a session on an empty machine and retains machine membership after
     page = await app.firstWindow()
     await expect(page.locator('.host-group').filter({ hasText: 'Legacy alias' })).toBeVisible()
     expect(tmux(['has-session', '-t', 'created-in-ui'])).toBe('')
+  } catch (error) {
+    await captureFailure(app)
+    throw error
   } finally {
     await app?.close()
     try {
