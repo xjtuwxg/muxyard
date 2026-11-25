@@ -6,7 +6,7 @@
 
 Tagline: **Your tmux sessions. A little more civilized.**
 
-Repository description: **A mouse-friendly macOS desktop home for your existing local and remote tmux sessions and coding agents.**
+Repository description: **A desktop GUI for the tmux sessions and coding agents you already run — locally or over SSH.**
 
 The promise is straightforward: keep the sessions, tools, and persistence you already trust, then add a useful desktop interface. Muxyard should be attractive even to a developer who never uses a coding agent.
 
@@ -25,7 +25,7 @@ No forced migration, account creation, remote agent installation, or replacement
 
 ### Current prototype
 
-Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery and creation; persisted preferred machines; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; compact terminal-first workspaces and focus mode; collapsible machine and pane navigation; session tabs and tmux window tabs, including in the single-row focus toolbar; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
+Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery and creation; persisted preferred machines; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; compact terminal-first workspaces and focus mode; five accessible light/dark palettes with system appearance and per-palette color customization; collapsible machine and pane navigation; session tabs and tmux window tabs, including in the single-row focus toolbar; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
 
 ### Daily-driver milestone
 
@@ -67,3 +67,5 @@ Possible launch title: **“I built a desktop home for the tmux sessions I alrea
 Suggested repository topics: `tmux`, `macos`, `ssh`, `terminal`, `desktop`, `coding-agents`, `electron`, `developer-tools`.
 
 Do not publish before real remote SSH validation and a usable installation path exist. Do not claim native Swift rendering, accurate agent task state, complete tmux key-table support in pane view, or detachable macOS pane windows until they ship.
+
+The initial website and repository About recommendation are documented in [website and GitHub positioning](website.md).

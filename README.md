@@ -2,7 +2,7 @@
 
 **Your tmux sessions. A little more civilized.**
 
-A desktop home for the tmux sessions and coding agents you already run. Connect to a machine, discover its existing sessions, and pick up exactly where you left off.
+A desktop GUI for the tmux sessions and coding agents you already run — locally or over SSH. Connect to a machine, discover its existing sessions, and pick up exactly where you left off.
 
 No account. No cloud relay. No remote Muxyard daemon. Just your computer, OpenSSH, and tmux.
 
@@ -26,6 +26,7 @@ No account. No cloud relay. No remote Muxyard daemon. Just your computer, OpenSS
 - Detach the app's client while keeping the underlying tmux session running.
 - Explore a clearly labeled demo without connecting to a machine.
 - Work in a compact terminal-first layout, with collapsible navigation and a focus mode.
+- Choose five light/dark themes, follow system appearance, and customize accent and terminal colors without reconnecting.
 
 Tmux remains responsible for persistence and process lifetime. Muxyard never migrates an existing agent, restarts its process, or detaches other clients with `attach -d`.
 
@@ -103,6 +104,24 @@ Tmux must be available on the remote non-interactive shell's `PATH`. No extra se
 
 The import button reads literal aliases in the main `~/.ssh/config` file. It skips wildcard patterns and does not expand `Include` files. Manually added aliases still use the full OpenSSH configuration, including `Include` and `ProxyJump`.
 
+## Make it yours
+
+Open **Appearance** using the palette button in the overview, attached workspace, or focus toolbar. Changes apply immediately to the interface and every existing terminal, including hidden windows. Switching colors preserves the connection, input, and scrollback.
+
+| Theme    | Appearance | Character                                                 |
+| -------- | ---------- | --------------------------------------------------------- |
+| Daylight | Light      | Crisp whites, slate text, and a clear blue accent         |
+| Paper    | Light      | Warm ivory, ink text, and a terracotta accent             |
+| Graphite | Dark       | Neutral charcoal with cool blue highlights                |
+| Dusk     | Dark       | Deep violet with a soft lavender accent                   |
+| Grove    | Dark       | The original forest palette with stronger readable labels |
+
+**Follow system appearance** is enabled by default: system light mode uses Daylight and dark mode uses Graphite. Choosing a palette fixes it until you enable system appearance again. Each palette remembers its own custom accent, terminal background, and terminal text colors. **Reset colors** restores the current palette; **Restore defaults** clears all overrides and follows the system again. Preferences survive app restarts.
+
+![Appearance settings with five built-in themes and per-palette color customization](docs/screenshots/appearance.png)
+
+Foreground colors are adjusted for readable contrast, including terminal ANSI colors. Programs that send explicit RGB colors or change their own palette retain that behavior; an app theme cannot automatically retheme every remote TUI. No terminal process is restarted or sent a theme command.
+
 ## Behavior to know
 
 **Sessions, windows, and panes stay distinct.** The top tab bar switches attached sessions. The **WINDOWS** row switches tmux windows inside the selected session; each window has its own panes. New windows inherit the selected pane's working directory and are created on the same host, socket, and session. Their processes keep running when you switch windows or detach Muxyard. Window creation and navigation work in both Pane view and Classic terminal. External window creation, renaming, and removal are reflected in the tabs, with control-mode updates in Pane view and discovery polling in Classic terminal.
@@ -164,7 +183,7 @@ MUXYARD_APP="$PWD/release/mac-arm64/Muxyard.app/Contents/MacOS/Muxyard" npm run 
 
 The application icon is generated from [the SVG source](assets/icon.svg). After changing it, run `npm run icon` before packaging.
 
-See [architecture](docs/architecture.md), [product direction](docs/product.md), and [contributing](CONTRIBUTING.md).
+See [architecture](docs/architecture.md), [product direction](docs/product.md), [website and GitHub positioning](docs/website.md), and [contributing](CONTRIBUTING.md).
 
 ## License
 

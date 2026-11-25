@@ -62,6 +62,16 @@ Layout toggles change visibility and sizing without remounting terminal componen
 
 Desktop tests measure terminal area, check that tmux's actual pane width increases in focus mode, verify a single client remains attached, and send input through that same client after resizing. Both Pane view and Classic terminal are covered.
 
+## Appearance
+
+The renderer defines five palettes with shared semantic CSS tokens in `themes.ts`. The same resolver supplies full xterm ANSI palettes to Pane view and Classic terminal. Readable foreground and accent colors are derived against their actual backgrounds. UI background, text, borders, status colors, focus outlines, and form controls use semantic tokens instead of fixed dark colors.
+
+Appearance is stored as a versioned, validated preference in `muxyard.appearance.v1` inside renderer-local storage. Overrides are limited to six-digit hex accent, terminal background, and terminal foreground colors and are remembered per palette. The default follows `prefers-color-scheme` through a media-query listener; an explicit palette ignores OS appearance changes. Initialization applies the saved tokens before the React tree mounts. Storage changes from another same-origin window are synchronized.
+
+The provider updates CSS variables and existing xterm `options.theme`. Theme changes are deliberately excluded from terminal connection effects, so changing colors does not recreate a client, hydrate a pane again, clear scrollback, resize the tmux layout, or send commands to remote programs. Existing hidden terminal surfaces receive the same update. Explicit true-color sequences from terminal programs remain authoritative.
+
+Unit checks verify default and custom color contrast, preference validation, and system resolution. Desktop checks exercise actual terminal text colors, keyboard palette selection, per-palette overrides, OS appearance changes, restart persistence, and unchanged live tmux client identity while switching themes in focus mode.
+
 ## Terminal transport and lifetime
 
 The interactive transport is a real PTY attached to a regular tmux client. Full-screen terminal programs, shell input, and existing tmux bindings pass through xterm.js. Local environment variables `TMUX` and `TMUX_PANE` are removed to avoid tmux's nested-session guard.

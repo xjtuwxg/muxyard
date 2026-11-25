@@ -1,3 +1,4 @@
+import { useTheme } from './ThemeProvider'
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { SearchAddon } from '@xterm/addon-search'
@@ -242,6 +243,7 @@ function PaneSurface({
   onAction: (type: PaneAction, direction?: 'horizontal' | 'vertical') => void
   onError: (message: string) => void
 }) {
+  const { theme } = useTheme()
   const element = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const instance = useRef<{ terminal: Terminal; search: SearchAddon } | undefined>(undefined)
@@ -263,12 +265,7 @@ function PaneSurface({
       scrollback: 10000,
       cursorBlink: true,
       cursorStyle: 'bar',
-      theme: {
-        background: '#111416',
-        foreground: '#d2d6d3',
-        cursor: '#a8cbb4',
-        selectionBackground: '#526a5d88'
-      }
+      theme: theme.terminal
     })
     const search = new SearchAddon()
     terminal.loadAddon(search)
@@ -371,6 +368,14 @@ function PaneSurface({
       instance.current = undefined
     }
   }, [api, connectionId, pane.id])
+
+  // Updating xterm options preserves the client, scrollback, and running processes.
+  useEffect(() => {
+    const terminal = instance.current?.terminal
+    if (!terminal) return
+    terminal.options.theme = theme.terminal
+    terminal.refresh(0, terminal.rows - 1)
+  }, [theme.terminal])
 
   useEffect(() => {
     const terminal = instance.current?.terminal

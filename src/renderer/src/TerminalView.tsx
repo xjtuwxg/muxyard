@@ -1,3 +1,4 @@
+import { useTheme } from './ThemeProvider'
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -26,6 +27,7 @@ export default function TerminalView({
   demo,
   onStatus
 }: Props) {
+  const { theme } = useTheme()
   const container = useRef<HTMLDivElement>(null)
   const instance = useRef<{ terminal: Terminal; fit: FitAddon; search: SearchAddon } | null>(null)
   const [searching, setSearching] = useState(false)
@@ -44,21 +46,7 @@ export default function TerminalView({
       cursorStyle: 'bar',
       scrollback: 10000,
       allowProposedApi: false,
-      theme: {
-        background: '#111416',
-        foreground: '#d2d6d3',
-        cursor: '#a8cbb4',
-        selectionBackground: '#526a5d88',
-        black: '#24292b',
-        red: '#de9090',
-        green: '#a8cbb4',
-        yellow: '#d7c08c',
-        blue: '#96b8d5',
-        magenta: '#b6a3cd',
-        cyan: '#99c8c8',
-        white: '#d2d6d3',
-        brightBlack: '#77807f'
-      }
+      theme: theme.terminal
     })
     const fit = new FitAddon()
     const search = new SearchAddon()
@@ -152,6 +140,14 @@ export default function TerminalView({
         instance.current?.terminal.focus()
       })
   }, [visible, focusRequest])
+
+  // Updating xterm options preserves the client, scrollback, and running processes.
+  useEffect(() => {
+    const terminal = instance.current?.terminal
+    if (!terminal) return
+    terminal.options.theme = theme.terminal
+    terminal.refresh(0, terminal.rows - 1)
+  }, [theme.terminal])
 
   async function copy(): Promise<void> {
     const text = instance.current?.terminal.getSelection()

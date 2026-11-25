@@ -32,12 +32,14 @@ import {
   PanelLeft,
   PanelRight,
   Minimize2,
-  Pin
+  Pin,
+  Palette
 } from 'lucide-react'
 import type { Host, NewSession, Pane, Snapshot, TmuxAction, TmuxSession } from '../../shared/types'
 import TerminalView from './TerminalView'
 import PaneWorkspace from './PaneWorkspace'
 import SSHImportDialog from './SSHImportDialog'
+import AppearancePanel from './AppearancePanel'
 import { demoHosts, demoSnapshots } from './demo'
 
 const api = window.muxyard
@@ -119,7 +121,9 @@ export default function App() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [selectedPanes, setSelectedPanes] = useState<Record<string, string>>({})
-  const [modal, setModal] = useState<'host' | 'help' | 'import' | 'session' | null>(null)
+  const [modal, setModal] = useState<'host' | 'help' | 'import' | 'session' | 'appearance' | null>(
+    null
+  )
   const [paneMode, setPaneMode] = useState(true)
   const [layout, setLayout] = useState<TerminalLayout>(initialTerminalLayout)
   const [focusRequest, setFocusRequest] = useState(0)
@@ -192,6 +196,11 @@ export default function App() {
       localStorage.setItem('muxyard.terminalLayout', JSON.stringify(layout))
     } catch {}
   }, [layout])
+
+  useEffect(() => {
+    // Return keyboard input to the attached terminal after closing an app dialog.
+    if (!modal) setFocusRequest((value) => value + 1)
+  }, [modal])
 
   const refresh = useCallback(
     async (ids?: string[]) => {
@@ -662,6 +671,14 @@ export default function App() {
             <strong>{activeTab ? activeTab.session.name : 'Overview'}</strong>
           </div>
           <div className="topbar-actions">
+            <button
+              className="icon-button"
+              aria-label="Appearance"
+              title="Appearance"
+              onClick={() => setModal('appearance')}
+            >
+              <Palette size={16} />
+            </button>
             <span className="privacy-label">
               <ShieldCheck size={13} /> No cloud. No account.
             </span>
@@ -1044,6 +1061,14 @@ export default function App() {
             <div className="focus-actions">
               <button
                 className="icon-button"
+                aria-label="Appearance"
+                title="Appearance"
+                onClick={() => setModal('appearance')}
+              >
+                <Palette size={14} />
+              </button>
+              <button
+                className="icon-button"
                 aria-label="New tmux window"
                 title="New tmux window (Ctrl+T / ⌘T)"
                 disabled={pending || !activePane}
@@ -1105,6 +1130,14 @@ export default function App() {
               <span className="toolbar-status">{activeTab.status}</span>
             </div>
             <div>
+              <button
+                className="icon-button"
+                aria-label="Appearance"
+                title="Appearance"
+                onClick={() => setModal('appearance')}
+              >
+                <Palette size={15} />
+              </button>
               <button
                 className="icon-button"
                 aria-label={layout.inspector ? 'Hide pane list' : 'Show pane list'}
@@ -1360,7 +1393,12 @@ export default function App() {
             if (event.target === event.currentTarget) setModal(null)
           }}
         >
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <section
+            className={`modal ${modal === 'appearance' ? 'appearance-modal' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+          >
             <button
               className="modal-close icon-button"
               aria-label="Close dialog"
@@ -1368,7 +1406,9 @@ export default function App() {
             >
               <X size={18} />
             </button>
-            {modal === 'import' && api ? (
+            {modal === 'appearance' ? (
+              <AppearancePanel />
+            ) : modal === 'import' && api ? (
               <SSHImportDialog
                 api={api}
                 onImported={(next) => {

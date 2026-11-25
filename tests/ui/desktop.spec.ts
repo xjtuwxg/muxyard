@@ -1,10 +1,14 @@
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { palettes, THEME_STORAGE_KEY } from '../../src/renderer/src/themes'
 import { shellQuote } from '../../src/main/tmux'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+
+const rgb = (hex: string): string =>
+  'rgb(' + [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16)).join(', ') + ')'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 
@@ -253,6 +257,17 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     ).toBeGreaterThan(0.9)
     await expect.poll(() => Number(active('#{pane_width}'))).toBeGreaterThan(managedColumns + 30)
     expect(active('#{session_attached}')).toBe('1')
+    const paneSurface = await page.locator('.gui-pane:visible .xterm').first().elementHandle()
+    const originalClient = tmux(['list-clients', '-t', 'ui-windows', '-F', '#{client_pid}']).trim()
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+    await page.getByRole('radio', { name: 'Paper', exact: true }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper')
+    await page.getByRole('button', { name: 'Close dialog' }).click()
+    expect(await paneSurface!.evaluate((element) => element.isConnected)).toBe(true)
+    expect(tmux(['list-clients', '-t', 'ui-windows', '-F', '#{client_pid}']).trim()).toBe(
+      originalClient
+    )
+    await page.locator('.gui-pane:visible .gui-pane-header strong').click()
     await page.keyboard.type("printf 'FOCUS_%s\\n' 'INPUT_OK'")
     await page.keyboard.press('Enter')
     await expect
@@ -511,6 +526,103 @@ test('creates a session on an empty machine and retains machine membership after
     try {
       tmux(['kill-server'])
     } catch {}
+    await rm(data, { recursive: true, force: true })
+  }
+})
+
+test('appearance presets support live terminal colors, system changes, customization and restart persistence', async () => {
+  const data = await mkdtemp(join(tmpdir(), 'muxyard-appearance-ui-'))
+  let app: ElectronApplication | undefined
+  try {
+    app = await launch(data)
+    let page = await app.firstWindow()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'daylight')
+    await page.getByRole('button', { name: 'Explore demo', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+    await expect(page.getByRole('switch', { name: 'Follow system appearance' })).toBeChecked()
+    await page.getByRole('radio', { name: 'Daylight', exact: true }).click()
+    await page.getByRole('radio', { name: 'Daylight', exact: true }).press('ArrowRight')
+    await expect(page.getByRole('radio', { name: 'Paper', exact: true })).toBeChecked()
+    await page.getByRole('radio', { name: 'Daylight', exact: true }).click()
+    await page.getByRole('dialog').screenshot({ path: join(tmpdir(), 'muxyard-appearance.png') })
+    await page.getByRole('button', { name: 'Close dialog' }).click()
+    await page.locator('.session-card').filter({ hasText: 'atlas-api' }).click()
+    const terminal = await page.locator('.xterm').first().elementHandle()
+    for (const palette of palettes) {
+      await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+      await page.getByRole('radio', { name: palette.name, exact: true }).click()
+      await expect(page.locator('html')).toHaveAttribute('data-theme', palette.id)
+      await expect(page.locator('html')).toHaveAttribute('data-appearance', palette.mode)
+      await page.getByRole('button', { name: 'Close dialog' }).click()
+      expect(await terminal!.evaluate((element) => element.isConnected)).toBe(true)
+      await expect(page.locator('.xterm-viewport').first()).toHaveCSS(
+        'background-color',
+        rgb(palette.terminal)
+      )
+      await expect(page.locator('.xterm-rows').first()).toHaveCSS('color', rgb(palette.text))
+      await page.screenshot({ path: join(tmpdir(), `muxyard-theme-${palette.id}.png`) })
+    }
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+    await page.getByRole('radio', { name: 'Paper', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Accent color hex', exact: true }).fill('#a42c55')
+    await page
+      .getByRole('textbox', { name: 'Terminal background hex', exact: true })
+      .fill('#fdf8ee')
+    await page.getByRole('textbox', { name: 'Terminal text hex', exact: true }).fill('#30271f')
+    const preferences = () =>
+      page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), THEME_STORAGE_KEY)
+    await expect.poll(preferences).toMatchObject({
+      theme: 'paper',
+      overrides: {
+        paper: { accent: '#a42c55', terminalBackground: '#fdf8ee', terminalForeground: '#30271f' }
+      }
+    })
+    await page.getByRole('textbox', { name: 'Accent color hex', exact: true }).fill('invalid')
+    await page.getByRole('textbox', { name: 'Terminal text hex', exact: true }).focus()
+    await expect(page.getByRole('textbox', { name: 'Accent color hex', exact: true })).toHaveValue(
+      '#a42c55'
+    )
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper')
+    await page.getByRole('switch', { name: 'Follow system appearance' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'graphite')
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'daylight')
+    await page.getByRole('radio', { name: 'Paper', exact: true }).click()
+    await page.getByRole('radio', { name: 'Graphite', exact: true }).click()
+    await page.getByRole('radio', { name: 'Paper', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Accent color hex', exact: true })).toHaveValue(
+      '#a42c55'
+    )
+    await page.getByRole('button', { name: 'Close dialog' }).click()
+    await page.getByRole('button', { name: 'Detach', exact: true }).click()
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-theme-paper-overview.png') })
+    expect(errors).toEqual([])
+    await app.close()
+    app = await launch(data)
+    page = await app.firstWindow()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper')
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Accent color hex', exact: true })).toHaveValue(
+      '#a42c55'
+    )
+    await expect(
+      page.getByRole('textbox', { name: 'Terminal background hex', exact: true })
+    ).toHaveValue('#fdf8ee')
+    await page.getByRole('button', { name: 'Reset colors', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Accent color hex', exact: true })).toHaveValue(
+      '#98502c'
+    )
+    await page.getByRole('button', { name: 'Restore defaults', exact: true }).click()
+    await expect(page.getByRole('switch', { name: 'Follow system appearance' })).toBeChecked()
+  } catch (error) {
+    await captureFailure(app)
+    throw error
+  } finally {
+    await app?.close()
     await rm(data, { recursive: true, force: true })
   }
 })

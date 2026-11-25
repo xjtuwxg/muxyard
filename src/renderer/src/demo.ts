@@ -108,19 +108,19 @@ export function demoSnapshots(): Record<string, Snapshot> {
 }
 
 export const demoOutput =
-  '\x1b[38;2;159;202;172m❯\x1b[0m claude\r\n\r\n' +
-  '\x1b[38;2;224;172;129m  ✳  Claude Code\x1b[0m  \x1b[2m/ Sample terminal preview\x1b[0m\r\n' +
-  '\x1b[2m     ~/Projects/atlas\x1b[0m\r\n\r\n' +
+  '\x1b[32m❯\x1b[0m claude\r\n\r\n' +
+  '\x1b[33m  ✳  Claude Code\x1b[0m  \x1b[90m/ Sample terminal preview\x1b[0m\r\n' +
+  '\x1b[90m     ~/Projects/atlas\x1b[0m\r\n\r\n' +
   '\x1b[1m❯ Add cursor pagination to the projects endpoint.\x1b[0m\r\n\r\n' +
   '  I’ll follow the existing API conventions and add coverage\r\n  for forward and backward pagination.\r\n\r\n' +
-  '\x1b[38;2;159;202;172m  ●\x1b[0m Read src/routes/projects.ts\r\n' +
-  '\x1b[38;2;159;202;172m  ●\x1b[0m Read src/lib/pagination.ts\r\n' +
-  '\x1b[38;2;159;202;172m  ●\x1b[0m Update src/routes/projects.ts\r\n\r\n' +
-  '\x1b[2m    24\x1b[0m  router.get("/projects", async (context) => {\r\n' +
-  '\x1b[38;2;159;202;172m  + 25    const cursor = context.req.query("cursor")\r\n' +
+  '\x1b[32m  ●\x1b[0m Read src/routes/projects.ts\r\n' +
+  '\x1b[32m  ●\x1b[0m Read src/lib/pagination.ts\r\n' +
+  '\x1b[32m  ●\x1b[0m Update src/routes/projects.ts\r\n\r\n' +
+  '\x1b[90m    24\x1b[0m  router.get("/projects", async (context) => {\r\n' +
+  '\x1b[32m  + 25    const cursor = context.req.query("cursor")\r\n' +
   '  + 26    const limit = parseLimit(context.req.query("limit"))\x1b[0m\r\n' +
-  '\x1b[2m    27\x1b[0m    const projects = await listProjects({ cursor, limit })\r\n\r\n' +
-  '\x1b[38;2;159;202;172m  ✓\x1b[0m 12 tests passed\r\n\r\n' +
+  '\x1b[90m    27\x1b[0m    const projects = await listProjects({ cursor, limit })\r\n\r\n' +
+  '\x1b[32m  ✓\x1b[0m 12 tests passed\r\n\r\n' +
   '  Pagination is ready for review.\r\n\r\n' +
-  '\x1b[2m─────────────────────────────────────────────────────────────\x1b[0m\r\n' +
-  '\x1b[38;2;159;202;172m❯\x1b[0m '
+  '\x1b[90m─────────────────────────────────────────────────────────────\x1b[0m\r\n' +
+  '\x1b[32m❯\x1b[0m '
