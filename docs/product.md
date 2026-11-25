@@ -4,7 +4,7 @@
 
 **Muxyard** combines “mux” with a yard: a place where existing terminals and agents come together. The name is short enough to say aloud and descriptive enough to connect to tmux. Initial web searches did not surface an established tmux product with this exact name; this is not a trademark clearance or a guarantee of repository, domain, or package-name availability.
 
-Tagline: **Your tmux sessions. A little more civilized.**
+Tagline: **Your tmux. A better view.**
 
 Repository description: **A desktop GUI for the tmux sessions and coding agents you already run — locally or over SSH.**
 

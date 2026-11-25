@@ -186,6 +186,32 @@ test('desktop connects to a real isolated tmux session and keeps it after detach
   }
 })
 
+async function expectPaneEdges(page: import('@playwright/test').Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.locator('.gui-pane:visible .pane-screen-viewport').evaluateAll(
+        (viewports) =>
+          viewports.length > 0 &&
+          viewports.every((viewport) => {
+            const bounds = viewport.getBoundingClientRect()
+            const scroll = viewport
+              .querySelector('.xterm-scrollable-element')
+              ?.getBoundingClientRect()
+            const screen = viewport.querySelector('.xterm-screen')?.getBoundingClientRect()
+            return (
+              scroll &&
+              screen &&
+              Math.abs(bounds.right - scroll.right) < 2 &&
+              screen.right <= bounds.right + 1 &&
+              bounds.right - screen.right < 28 &&
+              screen.bottom <= bounds.bottom + 1
+            )
+          })
+      )
+    )
+    .toBe(true)
+}
+
 test('creates and navigates real tmux windows with buttons, shortcuts, panes, and external updates', async () => {
   const data = await mkdtemp(join(tmpdir(), 'muxyard windows-'))
   const socket = `muxyard-windows-${process.pid}-${Date.now()}`
@@ -226,6 +252,7 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await page.locator('.session-card').filter({ hasText: 'ui-windows' }).click()
     await expect(page.locator('.toolbar-status')).toHaveText('Attached')
     await expect(page.getByRole('tab')).toHaveCount(1)
+    await expectPaneEdges(page)
     const shell = (await page.locator('.app-shell').boundingBox())!
     const compactTerminal = (await page.locator('.pane-screen-viewport:visible').boundingBox())!
     expect(
@@ -313,6 +340,11 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await expect(page.locator('.gui-pane:visible')).toHaveCount(2)
     await page.keyboard.press('Meta+Shift+d')
     await expect(page.locator('.gui-pane:visible')).toHaveCount(3)
+    await expectPaneEdges(page)
+    await page.setViewportSize({ width: 1180, height: 720 })
+    await expectPaneEdges(page)
+    await page.setViewportSize({ width: 1480, height: 940 })
+    await expectPaneEdges(page)
     await page.getByRole('tab', { name: 'Window 0: original', exact: true }).click()
     await expect(
       page.getByRole('tab', { name: 'Window 0: original', exact: true })

@@ -1,0 +1,14 @@
+{
+  "name": "muxyard-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-website.mjs",
+    "test:unit": "node --test tests/release.test.mjs",
+    "test": "playwright test",
+    "preview": "node ../scripts/serve-website.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

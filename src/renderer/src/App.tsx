@@ -1,3 +1,5 @@
+import brandMark from '../../../assets/brand/mark.svg?raw'
+import brandWordmark from '../../../assets/brand/wordmark.svg?raw'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowDownToLine,
@@ -78,17 +80,12 @@ const errorMessage = (error: unknown): string =>
 
 function Brand({ small = false }: { small?: boolean }) {
   return (
-    <div className={`brand ${small ? 'small' : ''}`}>
-      <span className="brand-mark">
-        <i />
-        <i />
-        <i />
-      </span>
-      {!small && (
-        <span>
-          muxyard<span className="brand-period">.</span>
-        </span>
-      )}
+    <div className={`brand ${small ? 'small' : ''}`} aria-label="Muxyard">
+      <span
+        className={small ? 'brand-mark' : 'brand-wordmark'}
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: small ? brandMark : brandWordmark }}
+      />
     </div>
   )
 }

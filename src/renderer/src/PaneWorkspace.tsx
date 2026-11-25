@@ -116,18 +116,50 @@ export default function PaneWorkspace(props: Props) {
       clearTimeout(timer)
       timer = setTimeout(() => {
         if (!container.current?.clientWidth || !container.current.clientHeight) return
+        const first = panes.find((pane) => pane.active) ?? panes[0]
+        const paneElement = container.current.querySelector<HTMLElement>(
+          `.gui-pane[data-pane-id="${first?.id}"]`
+        )
+        const screen = paneElement?.querySelector<HTMLElement>('.xterm-screen')
+        const viewport = paneElement?.querySelector<HTMLElement>('.pane-screen-viewport')
+        if (!first || !screen?.offsetWidth || !screen.offsetHeight || !viewport || !paneElement)
+          return
+        // Use rendered cell dimensions, including device-pixel rounding. Estimated
+        // line heights can shrink the entire surface and waste horizontal space.
+        const cellWidth = screen.offsetWidth / (first.width || 80)
+        const cellHeight = screen.offsetHeight / (first.height || 24)
+        const viewportStyle = getComputedStyle(viewport)
+        const paneStyle = getComputedStyle(paneElement)
+        const horizontalChrome =
+          parseFloat(viewportStyle.marginLeft) +
+          parseFloat(viewportStyle.marginRight) +
+          parseFloat(paneStyle.borderLeftWidth) +
+          parseFloat(paneStyle.borderRightWidth) +
+          8
+        const verticalChrome =
+          (paneElement.querySelector('.gui-pane-header')?.getBoundingClientRect().height ?? 24) +
+          parseFloat(viewportStyle.marginTop) +
+          parseFloat(viewportStyle.marginBottom) +
+          parseFloat(paneStyle.borderTopWidth) +
+          parseFloat(paneStyle.borderBottomWidth)
+        const horizontalBands = new Set(panes.map((pane) => pane.left ?? 0)).size || 1
         const verticalBands = new Set(panes.map((pane) => pane.top ?? 0)).size || 1
-        const headerHeight =
-          container.current.querySelector('.gui-pane-header')?.getBoundingClientRect().height ?? 24
         const cols = Math.min(
           1000,
-          Math.max(10, Math.floor((container.current.clientWidth - 12) / 7.83))
+          Math.max(
+            10,
+            Math.floor(
+              (container.current.clientWidth - horizontalChrome * horizontalBands) / cellWidth
+            )
+          )
         )
         const rows = Math.min(
           1000,
           Math.max(
             5,
-            Math.floor((container.current.clientHeight - (headerHeight + 8) * verticalBands) / 19.5)
+            Math.floor(
+              (container.current.clientHeight - verticalChrome * verticalBands) / cellHeight
+            )
           )
         )
         const size = `${cols},${rows}`
@@ -143,7 +175,15 @@ export default function PaneWorkspace(props: Props) {
       clearTimeout(timer)
       observer.disconnect()
     }
-  }, [ready, props.visible, props.api, id, panes.map((pane) => pane.top).join(',')])
+  }, [
+    ready,
+    props.visible,
+    props.api,
+    id,
+    windowId,
+    zoomed,
+    panes.map((pane) => `${pane.left}:${pane.top}`).join(',')
+  ])
 
   function select(pane: Pane): void {
     if (pane.id === desiredPane.current || (pane.id === activeId && pane.windowActive)) return
@@ -265,6 +305,7 @@ function PaneSurface({
       scrollback: 10000,
       cursorBlink: true,
       cursorStyle: 'bar',
+      overviewRuler: { width: 8 },
       theme: theme.terminal
     })
     const search = new SearchAddon()
@@ -390,12 +431,23 @@ function PaneSurface({
     if (!viewport.current || !element.current) return
     const fit = (): void => {
       const screen = element.current?.querySelector<HTMLElement>('.xterm-screen')
-      if (!screen || !viewport.current || !element.current || !viewport.current.clientWidth) return
+      if (
+        !screen ||
+        !viewport.current ||
+        !element.current ||
+        !viewport.current.clientWidth ||
+        !viewport.current.clientHeight
+      )
+        return
       const scale = Math.min(
         1,
-        viewport.current.clientWidth / Math.max(1, screen.offsetWidth),
+        Math.max(1, viewport.current.clientWidth - 8) / Math.max(1, screen.offsetWidth),
         viewport.current.clientHeight / Math.max(1, screen.offsetHeight)
       )
+      // Keep the scrolling container full-width even when a server-constrained
+      // grid has to scale down to fit. Only the grid retains its tmux dimensions.
+      element.current.style.width = `${viewport.current.clientWidth / scale}px`
+      element.current.style.height = `${viewport.current.clientHeight / scale}px`
       element.current.style.transform = `scale(${scale})`
     }
     const observer = new ResizeObserver(fit)

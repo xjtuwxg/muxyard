@@ -58,7 +58,7 @@ The release workflow validates the version tag, waits for all packaging jobs, ve
 
 Attached workspaces use compact chrome, with machine navigation and the pane inspector collapsed by default. A single attached session does not need a separate session-tab row. The overview keeps the full management layout. Focus mode hides both side panels and the session-tab row. Clickable window tabs move into the existing title strip alongside the session name and explicit exit action, so navigation does not add a second row. Machine, inspector, and focus preferences are stored in renderer-local storage; leaving focus mode restores the chosen panels.
 
-Layout toggles change visibility and sizing without remounting terminal components or changing connection IDs. Existing ResizeObservers adjust the PTY or control client. Pane workspace sizing accounts for the actual compact pane-header height. Keyboard shortcuts reveal hidden navigation when needed, while plain Escape and the tmux Ctrl+B prefix remain available to terminal applications.
+Layout toggles change visibility and sizing without remounting terminal components or changing connection IDs. Existing ResizeObservers adjust the PTY or control client. Pane workspace sizing measures rendered character cells and the actual compact header, border, margin, and scrollbar sizes. Scaling a server-constrained grid keeps its scroll container full-width, so the scrollbar remains at the pane edge. Client sizing continues to respect tmux constraints imposed by configuration or other clients. Keyboard shortcuts reveal hidden navigation when needed, while plain Escape and the tmux Ctrl+B prefix remain available to terminal applications.
 
 Desktop tests measure terminal area, check that tmux's actual pane width increases in focus mode, verify a single client remains attached, and send input through that same client after resizing. Both Pane view and Classic terminal are covered.
 
@@ -119,3 +119,7 @@ Real remote servers, SSH jump hosts, non-default user shells, agent wrappers, la
 - [node-pty](https://github.com/microsoft/node-pty)
 - [xterm.js documentation](https://xtermjs.org/docs/)
 - [tmux control mode](https://github.com/tmux/tmux/wiki/Control-Mode)
+
+## Public website and identity
+
+The static `website/` build is independent of Electron and uses a separate GitHub Pages workflow and test lockfile. It resolves public release assets at build time and excludes drafts. App, site, and documentation share the SVG pane mark and outlined wordmarks described in the [brand guide](brand.md).

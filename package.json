@@ -32,7 +32,11 @@
     "dist": "npm run build && electron-builder --publish never",
     "dist:mac:installers": "npm run dist -- --mac",
     "dist:win": "npm run dist -- --win --x64",
-    "dist:linux": "npm run dist -- --linux --x64"
+    "dist:linux": "npm run dist -- --linux --x64",
+    "site:build": "npm run build --prefix website",
+    "site:preview": "npm run preview --prefix website",
+    "site:test": "npm run test:unit --prefix website && npm test --prefix website",
+    "screenshots": "npm run build && node scripts/capture-website.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
@@ -104,7 +108,7 @@
     "type": "git",
     "url": "https://github.com/xjtuwxg/muxyard.git"
   },
-  "homepage": "https://github.com/xjtuwxg/muxyard#readme",
+  "homepage": "https://xiaoguang.wang/muxyard/",
   "bugs": {
     "url": "https://github.com/xjtuwxg/muxyard/issues"
   }

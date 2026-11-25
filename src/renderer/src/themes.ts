@@ -259,6 +259,10 @@ export function resolveTheme(appearance: Appearance, systemDark: boolean): Resol
     foreground,
     cursor: terminalAccent,
     cursorAccent: background,
+    overviewRulerBorder: '#00000000',
+    scrollbarSliderBackground: readableColor(mix(background, foreground, 0.42), background, 3),
+    scrollbarSliderHoverBackground: readableColor(mix(background, foreground, 0.56), background, 3),
+    scrollbarSliderActiveBackground: readableColor(mix(background, foreground, 0.7), background, 3),
     selectionBackground: mix(background, terminalAccent, terminalLight ? 0.24 : 0.3),
     selectionInactiveBackground: mix(background, terminalAccent, 0.15),
     selectionForeground: readableColor(

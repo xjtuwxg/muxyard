@@ -44,6 +44,7 @@ export default function TerminalView({
       lineHeight: 1.5,
       cursorBlink: true,
       cursorStyle: 'bar',
+      overviewRuler: { width: 8 },
       scrollback: 10000,
       allowProposedApi: false,
       theme: theme.terminal
