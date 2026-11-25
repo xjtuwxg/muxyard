@@ -7,7 +7,6 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const output = join(root, 'dist/website')
 const offline = process.argv.includes('--offline')
 let releases = []
-let themesAvailable = false
 const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'Muxyard-website' }
 if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`
 if (process.env.SITE_RELEASES_FILE) {
@@ -28,15 +27,6 @@ if (process.env.SITE_RELEASES_FILE) {
   }
 }
 const release = publicRelease(releases)
-if (release.version && !offline && !process.env.SITE_RELEASES_FILE) {
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${repository}/contents/src/renderer/src/themes.ts?ref=${encodeURIComponent(release.version)}`,
-      { headers, signal: AbortSignal.timeout(10000) }
-    )
-    themesAvailable = response.ok
-  } catch {}
-}
 await rm(output, { recursive: true, force: true })
 await mkdir(output, { recursive: true })
 for (const file of ['index.html', 'styles.css', 'site.js'])
@@ -52,11 +42,6 @@ siteURL.protocol = 'https:'
 if (!siteURL.pathname.endsWith('/')) siteURL.pathname += '/'
 let html = await readFile(join(output, 'index.html'), 'utf8')
 html = html.replaceAll('https://xjtuwxg.github.io/muxyard/', siteURL.href)
-if (themesAvailable)
-  html = html.replace(
-    'Theme customization is available in the source build and is coming to the next packaged preview.',
-    `Customizable themes are included in ${release.version}.`
-  )
 await writeFile(join(output, 'index.html'), html)
 await writeFile(join(output, 'release.json'), JSON.stringify(release, null, 2) + '\n')
 await writeFile(join(output, '.nojekyll'), '')
