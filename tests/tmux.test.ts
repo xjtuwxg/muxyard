@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   actionArgs,
+  newSessionArgs,
   commandFor,
   detectAgent,
   FIELD,
@@ -76,7 +77,7 @@ test('shell quotes remote arguments, including paths with executable syntax', ()
   const value = "/srv/O'Reilly/$(touch bad); echo no"
   assert.equal(shellQuote(value), "'/srv/O'\\''Reilly/$(touch bad); echo no'")
   const command = commandFor(remote, ['split-window', '-c', value])
-  assert.equal(command.file, '/usr/bin/ssh')
+  assert.ok(command.file.endsWith(process.platform === 'win32' ? 'ssh.exe' : '/usr/bin/ssh'))
   assert.ok(command.args.includes('StrictHostKeyChecking=yes'))
   assert.ok(command.args.includes('BatchMode=yes'))
   assert.equal(command.args.at(-1), `'tmux' '-u' 'split-window' '-c' ${shellQuote(value)}`)
@@ -112,4 +113,17 @@ test('imports literal SSH aliases, skipping wildcard and negated patterns', () =
     ),
     ['dev', 'staging', 'gpu-01']
   )
+})
+
+test('session creation validates names and sends literal remote working directories', () => {
+  for (const name of ['', '-flag', 'a.b', 'a:b', 'a;evil', 'x'.repeat(65)]) {
+    assert.throws(() => newSessionArgs({ name }))
+  }
+  for (const directory of ['relative/path', '/tmp/\ncommand', '/tmp/\0bad']) {
+    assert.throws(() => newSessionArgs({ name: 'project', directory }))
+  }
+  const directory = "/srv/O'Reilly/$(touch bad)"
+  const args = newSessionArgs({ name: 'project-1', directory })
+  assert.deepEqual(args.slice(-2), ['-c', directory])
+  assert.ok(commandFor(remote, args).args.at(-1)?.endsWith(shellQuote(directory)))
 })

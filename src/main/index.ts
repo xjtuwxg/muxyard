@@ -1,23 +1,22 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
-import { join } from 'node:path'
+import { join, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HostStore, sshAliases, importAliases } from './hosts'
-import { actionArgs, discover, runTmux, validateHost } from './tmux'
+import { actionArgs, discover, runTmux, validateHost, createSession } from './tmux'
 import { PaneConnections } from './panes'
 import { Terminals } from './terminals'
-import type { Host, TmuxAction } from '../shared/types'
+import type { Host, TmuxAction, NewSession } from '../shared/types'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 // Finder does not inherit a user's interactive shell PATH.
 process.env.PATH = [
   ...new Set([
-    ...(process.env.PATH ?? '').split(':'),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin'
+    ...(process.env.PATH ?? '').split(delimiter),
+    ...(process.platform === 'win32'
+      ? []
+      : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'])
   ])
-].join(':')
+].join(delimiter)
 let window: BrowserWindow | null = null
 let terminals: Terminals
 let hosts: HostStore
@@ -41,6 +40,7 @@ function registerIPC(): void {
   handle('hosts:list', () => hosts.list())
   handle('hosts:save', (host: Host) => hosts.save(host))
   handle('hosts:remove', (id: string) => hosts.remove(id))
+  handle('hosts:pin', (id: string, pinned: boolean) => hosts.pin(id, pinned))
   handle('hosts:candidates', async () =>
     (await sshAliases()).map((address) => ({
       address,
@@ -60,6 +60,7 @@ function registerIPC(): void {
     }
   })
   handle('tmux:discover', (id: string) => discover(hosts.get(id)))
+  handle('tmux:create', (id: string, request: NewSession) => createSession(hosts.get(id), request))
   handle('tmux:action', async (id: string, action: TmuxAction) => {
     const host = hosts.get(id)
     const snapshot = await discover(host)
@@ -130,8 +131,9 @@ async function createWindow(): Promise<void> {
     minHeight: 680,
     title: 'Muxyard',
     backgroundColor: '#101214',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 20, y: 23 },
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 20, y: 23 } }
+      : {}),
     webPreferences: {
       preload: join(here, '../preload/index.cjs'),
       sandbox: true,
@@ -176,7 +178,9 @@ app
     registerIPC()
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
-        { role: 'appMenu' },
+        ...(process.platform === 'darwin'
+          ? [{ role: 'appMenu' as const }]
+          : [{ label: 'File', submenu: [{ role: 'quit' as const }] }]),
         { role: 'editMenu' },
         {
           label: 'View',

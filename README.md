@@ -2,9 +2,9 @@
 
 **Your tmux sessions. A little more civilized.**
 
-A macOS desktop home for the tmux sessions and coding agents you already run. Connect to a machine, discover its existing sessions, and pick up exactly where you left off.
+A desktop home for the tmux sessions and coding agents you already run. Connect to a machine, discover its existing sessions, and pick up exactly where you left off.
 
-No account. No cloud relay. No remote Muxyard daemon. Just your Mac, OpenSSH, and tmux.
+No account. No cloud relay. No remote Muxyard daemon. Just your computer, OpenSSH, and tmux.
 
 ![Muxyard overview with explicitly labeled demo data](docs/screenshots/overview.png)
 
@@ -12,7 +12,8 @@ No account. No cloud relay. No remote Muxyard daemon. Just your Mac, OpenSSH, an
 
 ## What works
 
-- Discover existing sessions, windows, and panes on your Mac or an SSH host.
+- Discover existing sessions, windows, and panes on your computer or an SSH host.
+- Create and attach a session directly from a machine’s **Sessions** heading, even when tmux is not running yet.
 - Attach multiple sessions in terminal tabs, with full terminal input and output.
 - Create tmux windows with **Ctrl+T**, **Cmd+T**, or the **New window** button, then switch them in the dedicated window tab bar.
 - Display tmux splits as separate GUI terminal panels, with immediate mouse focus and input routed by pane ID.
@@ -59,11 +60,19 @@ To create a macOS app bundle for local testing:
 npm run dist:mac
 ```
 
-The app is written under `release/` and uses ad-hoc signing for local testing. Developer ID signing, notarization, and automatic updates are not configured.
+The app is written under `release/`. To create a DMG and ZIP for your Mac:
+
+```sh
+npm run dist:mac:installers
+```
+
+GitHub Actions configurations build macOS arm64/x64, Windows x64 (`.exe`), and Linux x64 (`.AppImage`, `.deb`) packages. A pushed version tag creates a **draft prerelease** with installers and checksums; it never publishes automatically. Windows currently supports remote tmux over SSH; local tmux and WSL integration are not implemented. Linux packages initially target Ubuntu 24.04.
+
+Mac builds currently use ad-hoc signing; Developer ID signing, notarization, Windows signing, and automatic updates are not configured. See the [release guide](docs/releasing.md) for local commands, version tags, draft review, platform requirements, and signing.
 
 ## Connect to a remote host
 
-Configure and verify the connection using macOS OpenSSH first:
+Configure and verify the connection using system OpenSSH first (omit the macOS-only `UseKeychain` option on Linux/Windows):
 
 ```sshconfig
 Host dev-server
@@ -86,7 +95,7 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=yes dev-server tmux -V
 
 In Muxyard, choose **Import SSH config**, select the aliases you want, and click **Add selected machines**. Nothing is selected or contacted automatically. **Check & select reachable** tests the aliases matching the filter with at most three concurrent attempts, selects successful connections, and leaves failures unchecked. You can also use **Add machine** to enter `dev-server` manually.
 
-Saved SSH machines connect only when chosen. Unused or unavailable machines live in the collapsed **Other machines** list, where they can be retried or removed. Successful connections refresh in the background; a failed connection stops polling until you explicitly choose it or refresh it again.
+Saved SSH machines connect only when chosen. Manually added and explicitly imported machines stay in **Machines** after restarting the app, even while offline. Older bulk-imported aliases remain in the collapsed **Other machines** list. Click their pin button to **Keep in Machines**, or connect successfully to promote them. Profiles and membership are stored in `hosts.json` inside Electron’s application-data directory, independently of transient connection snapshots. Successful connections refresh in the background; a failed connection stops polling until you explicitly choose it or refresh it again.
 
 Key authentication must work without an interactive prompt. New host keys must be verified in Terminal first; Muxyard does not disable host key verification. Key paths, ports, and jump hosts are handled by OpenSSH configuration. Muxyard does not read or store private keys.
 
@@ -115,7 +124,7 @@ Plain Ctrl+D continues to reach the terminal program. Pane view also supports th
 
 **The terminal gets the workspace.** Attached sessions default to a compact toolbar and window tabs. The machines sidebar and pane inspector start collapsed, the overview header and repeated status/help rows are hidden, and a single attached session does not consume a separate session-tab row. Use the panel buttons or Cmd+B / Cmd+Shift+B to reveal navigation when needed. **Cmd+K** also reveals the machines sidebar and focuses session search.
 
-**Focus mode maximizes terminal space.** Click **Focus** or press Cmd+Shift+F / Ctrl+Shift+F to hide both side panels, session tabs, and window tabs. A thin title strip keeps the current session/window, new-window and split actions, and **Exit focus** accessible. Window and pane shortcuts still work. Exit using the same shortcut or the visible button; plain Escape remains available to terminal programs. Your previous panel choices return when leaving focus mode. Layout preferences are saved locally, and the overview retains its full management interface.
+**Focus mode maximizes terminal space.** Click **Focus** or press Cmd+Shift+F / Ctrl+Shift+F to hide both side panels and session tabs. A single compact title strip keeps clickable, horizontally scrolling **window tabs**, the session name, new-window and split actions, and **Exit focus** accessible. You can switch windows with the mouse without leaving focus mode. Window and pane shortcuts still work. Exit using the same shortcut or the visible button; plain Escape remains available to terminal programs. Your previous panel choices return when leaving focus mode. Layout preferences are saved locally, and the overview retains its full management interface.
 
 Layout changes resize the existing terminal client rather than reconnecting it. This applies to both Pane view and Classic terminal; underlying tmux processes remain running.
 

@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { Host, Pane, PaneEvent, TmuxSession, TmuxAction } from '../shared/types'
 import { PANE_FORMAT, parseSnapshot, shellQuote, sshArgs, tmuxArgs, actionArgs } from './tmux'
 import { ControlProtocol, decodeOutput } from './control-protocol'
+import { sshExecutable, requireLocalTmux } from './platform'
 
 export class PaneConnection {
   private child: ChildProcessWithoutNullStreams
@@ -25,13 +26,14 @@ export class PaneConnection {
     private emit: (event: PaneEvent) => void
   ) {
     const args = tmuxArgs(host, ['-C', 'attach-session', '-t', sessionId])
+    if (host.kind === 'local') requireLocalTmux()
     const env = { ...process.env }
     delete env.TMUX
     delete env.TMUX_PANE
     this.child =
       host.kind === 'local'
         ? spawn('tmux', args, { env })
-        : spawn('/usr/bin/ssh', [...sshArgs(host), ['tmux', ...args].map(shellQuote).join(' ')], {
+        : spawn(sshExecutable(), [...sshArgs(host), ['tmux', ...args].map(shellQuote).join(' ')], {
             env
           })
     this.protocol = new ControlProtocol(
@@ -63,7 +65,7 @@ export class PaneConnection {
       return
     }
     if (
-      /^%(layout-change|window-pane-changed|session-window-changed|window-add|window-close|window-renamed|pane-mode-changed|session-renamed|sessions-changed)\b/.test(
+      /^%(layout-change|window-pane-changed|session-window-changed|(?:unlinked-)?window-(?:add|close|renamed)|pane-mode-changed|session-renamed|sessions-changed)\b/.test(
         line
       )
     )

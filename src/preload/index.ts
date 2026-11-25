@@ -2,15 +2,18 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopAPI, TerminalEvent, PaneEvent } from '../shared/types'
 
 const api: DesktopAPI = {
+  platform: process.platform,
   hosts: {
     list: () => ipcRenderer.invoke('hosts:list'),
     save: (host) => ipcRenderer.invoke('hosts:save', host),
     remove: (id) => ipcRenderer.invoke('hosts:remove', id),
+    pin: (id, pinned) => ipcRenderer.invoke('hosts:pin', id, pinned),
     candidates: () => ipcRenderer.invoke('hosts:candidates'),
     probe: (address) => ipcRenderer.invoke('hosts:probe', address),
     importSSH: (addresses) => ipcRenderer.invoke('hosts:import', addresses)
   },
   tmux: {
+    create: (id, request) => ipcRenderer.invoke('tmux:create', id, request),
     discover: (id) => ipcRenderer.invoke('tmux:discover', id),
     action: (id, action) => ipcRenderer.invoke('tmux:action', id, action)
   },

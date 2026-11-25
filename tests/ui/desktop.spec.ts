@@ -45,14 +45,14 @@ test('desktop demo supports session attachment, pane navigation, search and deta
       page.getByText('Sample machines and terminal output. No connection to your servers.')
     ).toBeVisible()
     await expect(page.locator('.session-card')).toHaveCount(3)
-    await page.screenshot({ path: '/private/tmp/muxyard-overview.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-overview.png') })
     await page.locator('.session-card').filter({ hasText: 'atlas-api' }).click()
     await expect(page.locator('.pane-inspector')).toContainText('Claude Code')
     await expect(page.locator('.terminal-view')).toBeVisible()
     await page.getByRole('button', { name: 'Find in terminal', exact: true }).click()
     await page.getByPlaceholder('Find in terminal…').fill('pagination')
     await page.getByRole('button', { name: 'Close search' }).click()
-    await page.screenshot({ path: '/private/tmp/muxyard-terminal.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-terminal.png') })
     await page.getByRole('button', { name: 'Detach', exact: true }).click()
     await expect(page.locator('.terminal-view')).toHaveCount(0)
     await page.getByRole('textbox', { name: 'Find a session' }).fill('web-studio')
@@ -140,7 +140,7 @@ test('desktop connects to a real isolated tmux session and keeps it after detach
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     )
-    await page.screenshot({ path: '/private/tmp/muxyard-panes.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-panes.png') })
     await page.locator(`.gui-pane[data-pane-id="${paneIds[1]}"] textarea`).press('Control+b')
     await page.keyboard.type('%')
     await expect(page.locator('.gui-pane:visible')).toHaveCount(3)
@@ -214,7 +214,7 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await expect(page.locator('.pane-inspector')).toBeVisible()
     const managedTerminal = (await page.locator('.pane-screen-viewport:visible').boundingBox())!
     expect(compactTerminal.width).toBeGreaterThan(managedTerminal.width * 1.3)
-    await page.screenshot({ path: '/private/tmp/muxyard-managed-layout.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-managed-layout.png') })
     await expect
       .poll(() => Number(active('#{pane_width}')))
       .toBeLessThan(Math.floor(compactTerminal.width / 8))
@@ -237,7 +237,17 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await expect
       .poll(() => tmux(['capture-pane', '-p', '-t', 'ui-windows:']))
       .toContain('FOCUS_INPUT_OK')
-    await page.screenshot({ path: '/private/tmp/muxyard-focus-layout.png' })
+    await expect(page.locator('.focus-window-tabs')).toBeVisible()
+    await page.keyboard.press('Control+t')
+    await expect(page.getByRole('tab')).toHaveCount(2)
+    await expect.poll(() => active('#{window_index}')).toBe('1')
+    const focusWindow = active('#{window_id}')
+    await page.getByRole('tab', { name: 'Window 0: original', exact: true }).click()
+    await expect.poll(() => active('#{window_index}')).toBe('0')
+    await expect(page.getByRole('button', { name: 'Exit focus mode', exact: true })).toBeVisible()
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-focus-layout.png') })
+    tmux(['kill-window', '-t', focusWindow])
+    await expect(page.getByRole('tab')).toHaveCount(1)
     await page.getByRole('button', { name: 'Exit focus mode', exact: true }).click()
     await expect(page.locator('.sidebar')).toBeVisible()
     await expect(page.locator('.pane-inspector')).toBeVisible()
@@ -248,7 +258,7 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await page.keyboard.press('Meta+Shift+b')
     await expect(page.locator('.sidebar')).toBeHidden()
     await expect(page.locator('.pane-inspector')).toBeHidden()
-    await page.screenshot({ path: '/private/tmp/muxyard-compact-layout.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-compact-layout.png') })
     await page.locator('.gui-pane:visible .gui-pane-header strong').click()
     await page.keyboard.press('Control+t')
     await expect(page.getByRole('tab')).toHaveCount(2)
@@ -286,7 +296,7 @@ test('creates and navigates real tmux windows with buttons, shortcuts, panes, an
     await page.locator('.gui-pane:visible textarea').press('Control+b')
     await page.keyboard.type('c')
     await expect(page.getByRole('tab')).toHaveCount(5)
-    await page.screenshot({ path: '/private/tmp/muxyard-windows.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-windows.png') })
     tmux(['new-window', '-t', 'ui-windows:', '-n', 'external-window', '/bin/sh'])
     await expect(page.getByRole('tab')).toHaveCount(6)
     await expect(page.getByRole('tab', { name: /external-window/ })).toHaveAttribute(
@@ -348,7 +358,13 @@ test('SSH import previews aliases without connecting, checks on demand, and impo
       })
       ipcMain.handle('hosts:import', (_event, addresses: string[]) => [
         { id: 'local', kind: 'local', name: 'This Mac', address: '' },
-        ...addresses.map((address) => ({ id: address, name: address, kind: 'ssh', address }))
+        ...addresses.map((address) => ({
+          id: address,
+          name: address,
+          kind: 'ssh',
+          address,
+          pinned: true
+        }))
       ])
       ipcMain.handle('tmux:discover', (_event, id) => {
         discoveries.push(id)
@@ -369,12 +385,11 @@ test('SSH import previews aliases without connecting, checks on demand, and impo
     await expect(page.getByRole('checkbox', { name: 'Import active-dev' })).toBeChecked()
     await expect(page.getByRole('checkbox', { name: 'Import old-server' })).not.toBeChecked()
     await expect(page.getByText('Connection timed out')).toBeVisible()
-    await page.screenshot({ path: '/private/tmp/muxyard-import.png' })
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-import.png') })
     await page.getByRole('button', { name: 'Add 1 selected machine', exact: true }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await page.locator('.other-machines summary').click()
-    await expect(page.locator('.other-machine-row')).toHaveCount(1)
-    await expect(page.locator('.other-machine-row')).toContainText('active-dev')
+    await expect(page.locator('.host-group').filter({ hasText: 'active-dev' })).toBeVisible()
+    await expect(page.locator('.other-machine-row')).toHaveCount(0)
     expect(
       await app.evaluate(() =>
         (
@@ -382,7 +397,7 @@ test('SSH import previews aliases without connecting, checks on demand, and impo
         ).muxyardTestDiscoveries.filter((id) => id !== 'local')
       )
     ).toEqual([])
-    await page.locator('.other-machine-row .host-nav').click()
+    await page.locator('.host-group .host-nav').filter({ hasText: 'active-dev' }).click()
     await expect
       .poll(() =>
         app!.evaluate(() =>
@@ -394,6 +409,78 @@ test('SSH import previews aliases without connecting, checks on demand, and impo
       .toBe(true)
   } finally {
     await app?.close()
+    await rm(data, { recursive: true, force: true })
+  }
+})
+
+test('creates a session on an empty machine and retains machine membership after restart', async () => {
+  test.skip(process.platform === 'win32', 'Local tmux is unavailable on Windows.')
+  const data = await mkdtemp(join(tmpdir(), 'muxyard-create-ui-'))
+  const socket = `muxyard-create-${process.pid}-${Date.now()}`
+  const tmux = (args: string[]): string =>
+    execFileSync('tmux', ['-L', socket, ...args], { encoding: 'utf8' })
+  let app: ElectronApplication | undefined
+  try {
+    await writeFile(
+      join(data, 'hosts.json'),
+      JSON.stringify([
+        {
+          id: 'empty',
+          name: 'Empty test machine',
+          kind: 'local',
+          address: '',
+          socket,
+          pinned: true
+        },
+        {
+          id: 'kept-ssh',
+          name: 'Saved SSH machine',
+          kind: 'ssh',
+          address: 'saved.invalid',
+          pinned: true
+        },
+        { id: 'ssh-legacy', name: 'Legacy alias', kind: 'ssh', address: 'legacy.invalid' }
+      ])
+    )
+    app = await launch(data)
+    let page = await app.firstWindow()
+    await page.locator('.host-nav').filter({ hasText: 'Empty test machine' }).click()
+    await expect(page.locator('.session-card')).toHaveCount(0)
+    await page.getByRole('button', { name: 'New session', exact: true }).click()
+    await page.getByLabel('Session name', { exact: false }).fill('created-in-ui')
+    await page.getByLabel('Working directory', { exact: false }).fill(await realpath(data))
+    await page.getByRole('button', { name: 'Create & attach', exact: true }).click()
+    await expect(page.locator('.toolbar-status')).toHaveText('Attached')
+    expect(
+      tmux(['display-message', '-p', '-t', 'created-in-ui:', '#{pane_current_path}']).trim()
+    ).toBe(await realpath(data))
+    await page.locator('.gui-pane:visible .gui-pane-header strong').click()
+    await page.keyboard.type("printf 'CREATED_%s\\n' 'SESSION_OK'")
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() => tmux(['capture-pane', '-p', '-t', 'created-in-ui:']))
+      .toContain('CREATED_SESSION_OK')
+    await app.close()
+    app = await launch(data)
+    page = await app.firstWindow()
+    await expect(page.locator('.host-group').filter({ hasText: 'Saved SSH machine' })).toBeVisible()
+    await expect(
+      page.locator('.host-group').filter({ hasText: 'Empty test machine' })
+    ).toBeVisible()
+    await page.locator('.other-machines summary').click()
+    await expect(page.locator('.other-machine-row')).toContainText('Legacy alias')
+    await page.getByRole('button', { name: 'Keep Legacy alias in Machines', exact: true }).click()
+    await expect(page.locator('.host-group').filter({ hasText: 'Legacy alias' })).toBeVisible()
+    await app.close()
+    app = await launch(data)
+    page = await app.firstWindow()
+    await expect(page.locator('.host-group').filter({ hasText: 'Legacy alias' })).toBeVisible()
+    expect(tmux(['has-session', '-t', 'created-in-ui'])).toBe('')
+  } finally {
+    await app?.close()
+    try {
+      tmux(['kill-server'])
+    } catch {}
     await rm(data, { recursive: true, force: true })
   }
 })

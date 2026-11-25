@@ -31,16 +31,22 @@ import {
   Trash2,
   PanelLeft,
   PanelRight,
-  Minimize2
+  Minimize2,
+  Pin
 } from 'lucide-react'
-import type { Host, Pane, Snapshot, TmuxAction, TmuxSession } from '../../shared/types'
+import type { Host, NewSession, Pane, Snapshot, TmuxAction, TmuxSession } from '../../shared/types'
 import TerminalView from './TerminalView'
 import PaneWorkspace from './PaneWorkspace'
 import SSHImportDialog from './SSHImportDialog'
 import { demoHosts, demoSnapshots } from './demo'
 
 const api = window.muxyard
-const localHost: Host = { id: 'local', name: 'This Mac', kind: 'local', address: '' }
+const localHost: Host = {
+  id: 'local',
+  name: api?.platform === 'win32' ? 'This computer' : 'This Mac',
+  kind: 'local',
+  address: ''
+}
 interface Tab {
   key: string
   host: Host
@@ -113,7 +119,7 @@ export default function App() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [selectedPanes, setSelectedPanes] = useState<Record<string, string>>({})
-  const [modal, setModal] = useState<'host' | 'help' | 'import' | null>(null)
+  const [modal, setModal] = useState<'host' | 'help' | 'import' | 'session' | null>(null)
   const [paneMode, setPaneMode] = useState(true)
   const [layout, setLayout] = useState<TerminalLayout>(initialTerminalLayout)
   const [focusRequest, setFocusRequest] = useState(0)
@@ -133,8 +139,7 @@ export default function App() {
   const focusActive = Boolean(activeTab && layout.focus)
   const host = hosts.find((item) => item.id === selectedHost) ?? hosts[0]
   const visibleHosts = hosts.filter(
-    (item) =>
-      item.kind === 'local' || item.id === selectedHost || (snapshots[item.id] && !errors[item.id])
+    (item) => item.kind === 'local' || item.pinned || item.id === selectedHost
   )
   const otherHosts = hosts.filter((item) => !visibleHosts.includes(item))
   const currentSnapshot = snapshots[host.id]
@@ -211,6 +216,14 @@ export default function App() {
                 if (generation.current !== current) return
                 setSnapshots((value) => ({ ...value, [host.id]: snapshot }))
                 connectedHosts.current.add(host.id)
+                if (host.kind === 'ssh' && !host.pinned) {
+                  void api.hosts
+                    .pin(host.id, true)
+                    .then((next) => {
+                      if (generation.current === current) setRealHosts(next)
+                    })
+                    .catch((error) => setNotice(errorMessage(error)))
+                }
                 setErrors((value) => {
                   const next = { ...value }
                   delete next[host.id]
@@ -444,9 +457,38 @@ export default function App() {
     }
   }
 
+  const windowButtons =
+    activeTab &&
+    activeSession &&
+    windows.map((item) => (
+      <button
+        key={item.id}
+        role="tab"
+        aria-selected={item.selected}
+        aria-label={`Window ${item.index}: ${item.name}`}
+        className={`window-tab ${item.selected ? 'selected' : ''}`}
+        onClick={() =>
+          void action(
+            activeTab.host,
+            activeSession,
+            item.panes.find((pane) => pane.active) ?? item.panes[0],
+            'select'
+          )
+        }
+      >
+        <span className="window-index">{item.index}</span>
+        <span className="window-tab-name">{item.name}</span>
+        <small>
+          {item.panes.length} {item.panes.length === 1 ? 'pane' : 'panes'}
+        </small>
+      </button>
+    ))
+  const canCreateSession =
+    !demo && Boolean(api) && !(api?.platform === 'win32' && host.kind === 'local')
+
   return (
     <div
-      className={`app-shell ${activeTab ? 'has-terminal' : ''} ${layout.sidebar ? 'sidebar-visible' : ''} ${layout.inspector ? 'inspector-visible' : ''} ${focusActive ? 'is-focus' : ''}`}
+      className={`app-shell ${api?.platform && api.platform !== 'darwin' ? 'platform-other' : ''} ${activeTab ? 'has-terminal' : ''} ${layout.sidebar ? 'sidebar-visible' : ''} ${layout.inspector ? 'inspector-visible' : ''} ${focusActive ? 'is-focus' : ''}`}
     >
       <aside className="sidebar">
         <div className="sidebar-title">
@@ -559,6 +601,19 @@ export default function App() {
                       </small>
                     </span>
                     <i className={`connection-dot ${errors[item.id] ? 'error' : ''}`} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label={`Keep ${item.name} in Machines`}
+                    title="Keep in Machines, including after restart"
+                    onClick={() =>
+                      void api?.hosts
+                        .pin(item.id, true)
+                        .then(setRealHosts)
+                        .catch((error) => setNotice(errorMessage(error)))
+                    }
+                  >
+                    <Pin size={12} />
                   </button>
                   <button
                     className="icon-button"
@@ -758,6 +813,13 @@ export default function App() {
                 </div>
                 <div>
                   <button
+                    className="subtle-button"
+                    disabled={!canCreateSession}
+                    onClick={() => setModal('session')}
+                  >
+                    <Plus size={14} /> New session
+                  </button>
+                  <button
                     className={`filter-button ${agentFilter ? 'active' : ''}`}
                     onClick={() => setAgentFilter(!agentFilter)}
                   >
@@ -880,9 +942,13 @@ export default function App() {
                   <p>
                     {filter || agentFilter
                       ? 'Try a different search or show all sessions.'
-                      : 'Start tmux on this machine, then refresh. Muxyard finds sessions you already use.'}
+                      : 'Create a session here, or start tmux on this machine and refresh.'}
                   </p>
-                  {!filter && !agentFilter && <code>tmux new -s my-project</code>}
+                  {!filter && !agentFilter && canCreateSession && (
+                    <button className="primary-button" onClick={() => setModal('session')}>
+                      <Plus size={14} /> Create session
+                    </button>
+                  )}
                   <div className="empty-actions">
                     <button className="subtle-button" onClick={toggleDemo}>
                       <Sparkles size={14} /> Explore the demo
@@ -970,10 +1036,11 @@ export default function App() {
             />
             <span className="focus-context">
               <strong>{activeSession.name}</strong>
-              <span>/</span>
-              {windows.find((item) => item.selected)?.name ?? activeTab.host.name}
             </span>
             {demo && <span className="demo-label">DEMO</span>}
+            <div className="window-tabs focus-window-tabs" role="tablist" aria-label="Tmux windows">
+              {windowButtons}
+            </div>
             <div className="focus-actions">
               <button
                 className="icon-button"
@@ -1132,29 +1199,7 @@ export default function App() {
           <nav className="window-tabbar" aria-label="Tmux windows">
             <span className="window-tabbar-label">WINDOWS</span>
             <div className="window-tabs" role="tablist" aria-label="Tmux windows">
-              {windows.map((item) => (
-                <button
-                  key={item.id}
-                  role="tab"
-                  aria-selected={item.selected}
-                  aria-label={`Window ${item.index}: ${item.name}`}
-                  className={`window-tab ${item.selected ? 'selected' : ''}`}
-                  onClick={() =>
-                    void action(
-                      activeTab.host,
-                      activeSession,
-                      item.panes.find((pane) => pane.active) ?? item.panes[0],
-                      'select'
-                    )
-                  }
-                >
-                  <span className="window-index">{item.index}</span>
-                  <span className="window-tab-name">{item.name}</span>
-                  <small>
-                    {item.panes.length} {item.panes.length === 1 ? 'pane' : 'panes'}
-                  </small>
-                </button>
-              ))}
+              {windowButtons}
             </div>
             <button
               className="new-window-button"
@@ -1334,6 +1379,37 @@ export default function App() {
                   )
                 }}
               />
+            ) : modal === 'session' ? (
+              <SessionForm
+                host={host}
+                onSave={async (request) => {
+                  if (!api || !canCreateSession)
+                    throw new Error('Choose an available machine first.')
+                  const session = await api.tmux.create(host.id, request)
+                  setSnapshots((value) => ({
+                    ...value,
+                    [host.id]: {
+                      checkedAt: Date.now(),
+                      sessions: [
+                        ...(value[host.id]?.sessions ?? []).filter(
+                          (item) => item.id !== session.id
+                        ),
+                        session
+                      ]
+                    }
+                  }))
+                  setErrors((value) => {
+                    const next = { ...value }
+                    delete next[host.id]
+                    return next
+                  })
+                  connectedHosts.current.add(host.id)
+                  setFilter('')
+                  setAgentFilter(false)
+                  setModal(null)
+                  openSession(host, session)
+                }}
+              />
             ) : modal === 'host' ? (
               <HostForm
                 demo={demo}
@@ -1356,7 +1432,7 @@ export default function App() {
                 <h2 id="modal-title">Your workflow, still yours.</h2>
                 <div className="help-content">
                   <p>
-                    <strong>Connect over your existing SSH setup.</strong> Muxyard uses macOS
+                    <strong>Connect over your existing SSH setup.</strong> Muxyard uses system
                     OpenSSH, your SSH config, known hosts, and ssh-agent. Verify the connection in
                     Terminal first. Password prompts and new host-key approval aren’t supported
                     inside Muxyard yet.
@@ -1469,6 +1545,8 @@ function HostForm({ demo, onSave }: { demo: boolean; onSave: (host: Host) => Pro
         <button
           type="button"
           className={kind === 'local' ? 'selected' : ''}
+          disabled={api?.platform === 'win32'}
+          title={api?.platform === 'win32' ? 'Windows supports remote tmux over SSH.' : undefined}
           onClick={() => setKind('local')}
         >
           <Monitor size={14} /> Local socket
@@ -1530,6 +1608,79 @@ function HostForm({ demo, onSave }: { demo: boolean; onSave: (host: Host) => Pro
       <button type="submit" className="primary-button submit-button" disabled={saving || demo}>
         {saving ? <RefreshCw size={15} className="spinning" /> : <Plus size={15} />}
         {saving ? 'Saving…' : 'Add machine'}
+      </button>
+    </form>
+  )
+}
+
+function SessionForm({
+  host,
+  onSave
+}: {
+  host: Host
+  onSave: (request: NewSession) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [directory, setDirectory] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (saving) return
+        setSaving(true)
+        setError('')
+        void onSave({
+          name: name.trim(),
+          ...(directory.trim() ? { directory: directory.trim() } : {})
+        })
+          .catch((error) => setError(errorMessage(error)))
+          .finally(() => setSaving(false))
+      }}
+    >
+      <div className="modal-symbol">
+        <SquareTerminal size={24} />
+      </div>
+      <div className="eyebrow">A FRESH WORKSPACE</div>
+      <h2 id="modal-title">New session on {host.name}</h2>
+      <p className="modal-description">
+        Starts tmux on this machine and opens your new session. It keeps running after you detach.
+      </p>
+      <label>
+        Session name
+        <input
+          required
+          autoFocus
+          maxLength={64}
+          pattern="[a-zA-Z0-9_][a-zA-Z0-9_-]*"
+          placeholder="my-project"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <span className="field-help">
+          Letters, numbers, underscores and hyphens. Must be unique on this machine.
+        </span>
+      </label>
+      <label>
+        Working directory <span className="optional">optional</span>
+        <input
+          value={directory}
+          onChange={(event) => setDirectory(event.target.value)}
+          placeholder="/home/you/project"
+        />
+        <span className="field-help">
+          An existing absolute path on {host.name}. Leave empty to use tmux’s default.
+        </span>
+      </label>
+      {error && (
+        <div className="form-error" role="alert">
+          {error}
+        </div>
+      )}
+      <button type="submit" className="primary-button submit-button" disabled={saving}>
+        {saving ? <RefreshCw size={15} className="spinning" /> : <Plus size={15} />}
+        {saving ? 'Creating…' : 'Create & attach'}
       </button>
     </form>
   )

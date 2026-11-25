@@ -1,6 +1,15 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { AgentKind, Host, Pane, Snapshot, TmuxAction } from '../shared/types'
+import type {
+  AgentKind,
+  Host,
+  Pane,
+  Snapshot,
+  TmuxAction,
+  NewSession,
+  TmuxSession
+} from '../shared/types'
+import { sshExecutable, requireLocalTmux } from './platform'
 
 const execFileAsync = promisify(execFile)
 export const FIELD = '\t'
@@ -64,11 +73,14 @@ export function validateHost(host: Host): Host {
     (typeof host.socket !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(host.socket))
   )
     throw new Error('Socket names may contain letters, numbers, underscores, and hyphens.')
+  if (host.pinned !== undefined && typeof host.pinned !== 'boolean')
+    throw new Error('Invalid machine preference.')
   return {
     id: host.id,
     name: host.name.trim(),
     kind: host.kind,
     address: host.kind === 'local' ? '' : host.address,
+    pinned: host.pinned ?? !host.id.startsWith('ssh-'),
     ...(host.socket ? { socket: host.socket } : {})
   }
 }
@@ -165,9 +177,12 @@ export function sshArgs(host: Host, tty = false): string[] {
 
 export function commandFor(host: Host, args: string[]): { file: string; args: string[] } {
   const command = tmuxArgs(host, args)
-  if (host.kind === 'local') return { file: 'tmux', args: command }
+  if (host.kind === 'local') {
+    requireLocalTmux()
+    return { file: 'tmux', args: command }
+  }
   return {
-    file: '/usr/bin/ssh',
+    file: sshExecutable(),
     args: [...sshArgs(host), ['tmux', ...command].map(shellQuote).join(' ')]
   }
 }
@@ -199,6 +214,51 @@ export async function runTmux(host: Host, args: string[]): Promise<string> {
 
 export async function discover(host: Host): Promise<Snapshot> {
   return parseSnapshot(await runTmux(host, ['list-panes', '-a', '-F', PANE_FORMAT]))
+}
+
+export function newSessionArgs(request: NewSession): string[] {
+  if (
+    !request ||
+    typeof request.name !== 'string' ||
+    !/^[a-zA-Z0-9_][a-zA-Z0-9_-]{0,63}$/.test(request.name)
+  )
+    throw new Error('Use 1–64 letters, numbers, underscores, or hyphens for the session name.')
+  if (
+    request.directory !== undefined &&
+    (typeof request.directory !== 'string' ||
+      request.directory.length > 4096 ||
+      !request.directory.startsWith('/') ||
+      /[\r\n\0]/.test(request.directory))
+  )
+    throw new Error('Use an absolute directory on this machine, such as /home/user/project.')
+  return [
+    'new-session',
+    '-d',
+    '-s',
+    request.name,
+    '-x',
+    '120',
+    '-y',
+    '32',
+    '-P',
+    '-F',
+    '#{session_id}',
+    ...(request.directory ? ['-c', request.directory] : [])
+  ]
+}
+
+export async function createSession(host: Host, request: NewSession): Promise<TmuxSession> {
+  const id = (await runTmux(host, newSessionArgs(request)))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .reverse()
+    .find((line) => /^\$\d+$/.test(line))
+  const session = (await discover(host)).sessions.find((session) => session.id === id)
+  if (!session)
+    throw new Error(
+      'The new session is no longer available. Check this machine’s tmux startup configuration.'
+    )
+  return session
 }
 
 export function actionArgs(action: TmuxAction, pane: Pane): string[] {

@@ -1982,6 +1982,32 @@ h1 > span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  max-width: 130px;
+  flex-shrink: 0;
+}
+.focus-window-tabs {
+  flex: 1;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+.focus-window-tabs .window-tab {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+.focus-window-tabs .window-tab-name {
+  max-width: 100px;
+}
+.focus-window-tabs .window-tab small {
+  display: none;
+}
+.platform-other .focus-toolbar,
+.platform-other.has-terminal .workspace-toolbar {
+  padding-left: 12px;
+}
+.platform-other .sidebar-title {
+  padding-top: 18px;
+  height: 64px;
 }
 .focus-context strong {
   font-weight: 500;

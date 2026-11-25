@@ -46,9 +46,17 @@ Classic terminal attachment and standalone pane actions verify current discovery
 
 The window tab bar is derived from stable window IDs in the selected session snapshot and sorted by tmux window index. Selecting a window restores its active pane. New-window commands explicitly target the session and inherit the selected pane's working directory. Next/previous-window commands are scoped to the same session. Workspace shortcuts are handled during key-event capture so terminal widgets do not receive the reserved keystrokes; composing text and form/dialog inputs are excluded. Ctrl+D is deliberately passed through.
 
+New-session requests validate a short session name and optional absolute working directory, run detached `new-session` on the chosen host/socket, discover its stable ID, and attach through the normal workspace. A new server starts if necessary. Duplicate names and invalid paths produce an error in the form without replacing an existing session.
+
+## Platform and distribution
+
+macOS and Linux use `/usr/bin/ssh` and support local tmux. Windows uses system OpenSSH Client and supports remote tmux only; local tmux and WSL integration are explicitly rejected. PATH separators and window/menu chrome follow the host OS. Electron Builder packages node-pty outside ASAR. Native build jobs run on each target OS, producing Mac arm64/x64 DMG/ZIP, Windows x64 NSIS, and Linux x64 AppImage/DEB.
+
+The release workflow validates the version tag, waits for all packaging jobs, verifies the expected assets, creates SHA-256 checksums, and uploads to a draft prerelease. It cannot overwrite a published release. Current Mac signing is ad-hoc, Windows packages are unsigned, and automatic updates are not implemented. See [releasing](releasing.md).
+
 ## Terminal-first layout
 
-Attached workspaces use compact chrome, with machine navigation and the pane inspector collapsed by default. A single attached session does not need a separate session-tab row. The overview keeps the full management layout. Focus mode hides both side panels and tab rows while retaining a small title strip with an explicit exit action. Machine, inspector, and focus preferences are stored in renderer-local storage; leaving focus mode restores the chosen panels.
+Attached workspaces use compact chrome, with machine navigation and the pane inspector collapsed by default. A single attached session does not need a separate session-tab row. The overview keeps the full management layout. Focus mode hides both side panels and the session-tab row. Clickable window tabs move into the existing title strip alongside the session name and explicit exit action, so navigation does not add a second row. Machine, inspector, and focus preferences are stored in renderer-local storage; leaving focus mode restores the chosen panels.
 
 Layout toggles change visibility and sizing without remounting terminal components or changing connection IDs. Existing ResizeObservers adjust the PTY or control client. Pane workspace sizing accounts for the actual compact pane-header height. Keyboard shortcuts reveal hidden navigation when needed, while plain Escape and the tmux Ctrl+B prefix remain available to terminal applications.
 
@@ -70,11 +78,11 @@ Closing a tab terminates only its local client process. Tmux manages the session
 - Navigation and new windows are denied. The app loads bundled application content in production.
 - SSH destinations and socket names are validated. Local commands use argument arrays. Every remote command token is shell-quoted.
 - SSH uses `BatchMode=yes` and `StrictHostKeyChecking=yes`. Unknown host keys and password prompts fail visibly.
-- Host profiles contain only labels, destinations, and socket names. Private keys and passwords are never copied into application storage.
+- Host profiles contain only labels, destinations, socket names, and machine-group preferences. Private keys and passwords are never copied into application storage.
 - Terminal output is rendered by a terminal emulator rather than inserted into HTML. The app does not install an OSC clipboard handler or open output-provided URLs automatically.
 - No telemetry, cloud account, or network listener is part of the packaged runtime. The development server is only for development.
 
-Host profiles are stored in Electron's user-data directory as `hosts.json`, written through a temporary file with owner-only file permissions. The built-in `local` profile is immutable. The development-only `MUXYARD_DATA_DIR` environment variable isolates automated tests.
+Host profiles are stored in Electron's user-data directory as `hosts.json`, written through a temporary file with owner-only POSIX permissions where supported. A persisted `pinned` preference determines Machines membership independently of connection snapshots. Manually added and explicitly selected imports default to pinned; older `ssh-` profiles migrate to Other machines and can be promoted with a pin action or successful connection. Offline status does not remove a pinned machine from Machines. The built-in `local` profile is immutable. The development-only `MUXYARD_DATA_DIR` environment variable isolates automated tests.
 
 ## Pane-view control mode
 
@@ -90,7 +98,7 @@ The control client's dimensions are updated with `refresh-client -C`. Pane termi
 
 ## Validation boundaries
 
-Unit tests cover metadata parsing, executable recognition, selective SSH import, argument quoting, destination validation, concurrent profile persistence, protocol framing, octal decoding, and capture ordering. Integration tests use isolated tmux servers to exercise both transports, separate pane streams, input routing, window creation/navigation, external splits, cursor hydration, zoom, and detach persistence. Electron UI tests cover direct mouse/keyboard focus, window and pane shortcuts, separate window layouts, external window creation/rename/removal, view switching, and selective import using simulated SSH outcomes without contacting real SSH hosts. A separate session in the window tests verifies that new windows are created only in the intended session.
+Unit tests cover metadata parsing, executable recognition, selective SSH import, argument quoting, destination validation, concurrent profile persistence, protocol framing, octal decoding, and capture ordering. Integration tests use isolated tmux servers to exercise both transports, separate pane streams, input routing, window creation/navigation, external splits, cursor hydration, zoom, and detach persistence. Electron UI tests cover direct mouse/keyboard focus, window and pane shortcuts, separate window layouts, external window creation/rename/removal, view switching, focus-mode mouse window switching, new-session creation on an empty server, profile membership across restarts, and selective import using simulated SSH outcomes without contacting real SSH hosts. A separate session in the window tests verifies that new windows are created only in the intended session.
 
 Real remote servers, SSH jump hosts, non-default user shells, agent wrappers, large output streams, macOS sleep/wake, and long-duration sessions need additional validation before a general release.
 

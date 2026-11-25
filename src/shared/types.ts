@@ -4,6 +4,11 @@ export interface Host {
   kind: 'local' | 'ssh'
   address: string
   socket?: string
+  pinned?: boolean
+}
+export interface NewSession {
+  name: string
+  directory?: string
 }
 
 export type AgentKind = 'Claude Code' | 'Codex' | 'OpenCode' | 'Gemini' | 'Aider'
@@ -80,15 +85,18 @@ export interface TerminalEvent {
 }
 
 export interface DesktopAPI {
+  platform: string
   hosts: {
     list(): Promise<Host[]>
     save(host: Host): Promise<Host[]>
     remove(id: string): Promise<Host[]>
+    pin(id: string, pinned: boolean): Promise<Host[]>
     candidates(): Promise<SSHCandidate[]>
     probe(address: string): Promise<HostProbe>
     importSSH(addresses: string[]): Promise<Host[]>
   }
   tmux: {
+    create(hostId: string, request: NewSession): Promise<TmuxSession>
     discover(hostId: string): Promise<Snapshot>
     action(hostId: string, action: TmuxAction): Promise<void>
   }

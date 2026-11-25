@@ -4,7 +4,13 @@ import { homedir } from 'node:os'
 import type { Host } from '../shared/types'
 import { validateHost } from './tmux'
 
-export const LOCAL_HOST: Host = { id: 'local', name: 'This Mac', kind: 'local', address: '' }
+export const LOCAL_HOST: Host = {
+  id: 'local',
+  name: process.platform === 'darwin' ? 'This Mac' : 'This computer',
+  kind: 'local',
+  address: '',
+  pinned: true
+}
 
 export class HostStore {
   private hosts: Host[] = [LOCAL_HOST]
@@ -40,6 +46,15 @@ export class HostStore {
     if (id === 'local') throw new Error('The built-in local host cannot be removed.')
     return this.mutate(async () => {
       await this.persist(this.hosts.filter((item) => item.id !== id))
+      return this.list()
+    })
+  }
+  async pin(id: string, pinned: boolean): Promise<Host[]> {
+    if (typeof pinned !== 'boolean') throw new Error('Invalid machine preference.')
+    if (id === 'local') throw new Error('The built-in machine is always in Machines.')
+    return this.mutate(async () => {
+      const host = this.get(id)
+      await this.persist(this.hosts.map((item) => (item.id === id ? { ...host, pinned } : item)))
       return this.list()
     })
   }
@@ -91,7 +106,13 @@ export async function importAliases(
     throw new Error('Select SSH aliases from the import list.')
   for (const address of new Set(addresses)) {
     if (store.list().some((host) => host.kind === 'ssh' && host.address === address)) continue
-    await store.save({ id: `ssh-${crypto.randomUUID()}`, kind: 'ssh', name: address, address })
+    await store.save({
+      id: `ssh-${crypto.randomUUID()}`,
+      kind: 'ssh',
+      name: address,
+      address,
+      pinned: true
+    })
   }
   return store.list()
 }

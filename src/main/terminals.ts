@@ -1,6 +1,7 @@
 import * as pty from 'node-pty'
 import type { Host, TerminalEvent } from '../shared/types'
 import { shellQuote, sshArgs, tmuxArgs } from './tmux'
+import { sshExecutable, requireLocalTmux } from './platform'
 
 interface Connection {
   process: pty.IPty
@@ -18,7 +19,8 @@ export class Terminals {
     if (this.connections.size >= 12)
       throw new Error('Detach a terminal before opening more than 12 connections.')
     const args = tmuxArgs(host, ['attach-session', '-t', sessionId])
-    const file = host.kind === 'local' ? 'tmux' : '/usr/bin/ssh'
+    if (host.kind === 'local') requireLocalTmux()
+    const file = host.kind === 'local' ? 'tmux' : sshExecutable()
     const argv =
       host.kind === 'local'
         ? args

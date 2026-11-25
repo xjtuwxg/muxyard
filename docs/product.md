@@ -25,17 +25,17 @@ No forced migration, account creation, remote agent installation, or replacement
 
 ### Current prototype
 
-Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; compact terminal-first workspaces and focus mode; collapsible machine and pane navigation; session tabs and tmux window tabs; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
+Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery and creation; persisted preferred machines; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; compact terminal-first workspaces and focus mode; collapsible machine and pane navigation; session tabs and tmux window tabs, including in the single-row focus toolbar; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
 
 ### Daily-driver milestone
 
 - Validate SSH on Linux and macOS, including aliases, `Include`, `ProxyJump`, IPv6, encrypted keys, and non-default shells.
-- Persist preferred machines and recently attached sessions, with explicit reconnect behavior.
+- Persist recently attached sessions, with explicit reconnect behavior.
 - Handle Mac sleep/wake, lost Wi-Fi, and reconnect backoff while retaining clear status.
 - Add context menus, accessible keyboard navigation, adjustable font sizes, and a resizable inspector.
 - Verify large output, Unicode/IME input, bracketed paste, terminal mouse reporting, and clipboard behavior in real agent TUIs.
 - Measure idle CPU, memory per terminal, and input/render latency.
-- Prepare a signed and notarized macOS build and a repeatable release pipeline.
+- Validate the cross-platform release pipeline on real target machines and prepare signed/notarized public packages.
 
 ### Deeper tmux integration
 
@@ -43,7 +43,7 @@ Local and SSH profiles; selective SSH import and optional reachability checks; o
 - Add detachable macOS windows for individual panes, with deliberate connection ownership and cleanup.
 - Support mouse-driven pane resizing and layouts while retaining the real tmux layout.
 - Evaluate grouped sessions for independent window navigation, with deliberate lifecycle cleanup.
-- Add custom socket paths and deliberate support for creating, renaming, and ending sessions. Destructive actions need clear target labels and confirmations.
+- Add custom socket paths and deliberate support for renaming and ending sessions. Destructive actions need clear target labels and confirmations.
 
 ### Agent awareness
 

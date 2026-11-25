@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "A desktop home for your existing tmux sessions and coding agents.",
-  "author": "Muxyard contributors",
+  "author": {
+    "name": "Muxyard contributors",
+    "email": "2418907+xjtuwxg@users.noreply.github.com"
+  },
   "license": "MIT",
   "main": "out/main/index.js",
   "type": "module",
@@ -24,8 +27,12 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
     "test:ui": "playwright test",
-    "dist:mac": "npm run build && electron-builder --mac --dir",
-    "postinstall": "electron-builder install-app-deps"
+    "dist:mac": "npm run build && electron-builder --mac --dir --publish never",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:mac:installers": "npm run dist -- --mac",
+    "dist:win": "npm run dist -- --win --x64",
+    "dist:linux": "npm run dist -- --linux --x64"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
@@ -71,6 +78,34 @@
         "dmg",
         "zip"
       ]
+    },
+    "artifactName": "Muxyard-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xjtuwxg/muxyard.git"
+  },
+  "homepage": "https://github.com/xjtuwxg/muxyard#readme",
+  "bugs": {
+    "url": "https://github.com/xjtuwxg/muxyard/issues"
   }
 }
