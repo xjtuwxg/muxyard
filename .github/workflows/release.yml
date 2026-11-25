@@ -64,7 +64,7 @@ jobs:
         if: runner.os != 'Windows'
         run: npm run test:integration
       - name: Build installers
-        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        run: npx electron-builder --config electron-builder.config.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           # AppImage tooling can extract its runtime instead of mounting FUSE in CI.
           APPIMAGE_EXTRACT_AND_RUN: '1'
@@ -75,7 +75,7 @@ jobs:
           MUXYARD_APP: ${{ github.workspace }}/release/${{ matrix.arch == 'arm64' && 'mac-arm64' || 'mac' }}/Muxyard.app/Contents/MacOS/Muxyard
       - name: Desktop smoke tests (Windows)
         if: runner.os == 'Windows'
-        run: npm run test:ui -- --grep 'desktop demo|SSH import|appearance presets'
+        run: npm run test:ui -- --grep 'desktop demo|SSH import|appearance presets|software updates'
         env:
           MUXYARD_APP: ${{ github.workspace }}/release/win-unpacked/Muxyard.exe
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -90,6 +90,8 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/latest-*.yml
+            release/*.blockmap
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -118,6 +120,7 @@ jobs:
           pattern: installers-*
           path: artifacts
           merge-multiple: true
+      - run: npm ci --ignore-scripts
       - name: Create draft release and upload installers
         run: node scripts/release.mjs
         env:

@@ -15,7 +15,7 @@
 
 ![Muxyard Graphite theme showing clearly labeled demo sessions and coding agents](website/assets/screenshots/overview-graphite.png)
 
-_Current source preview with labeled demo data. Published v0.1.0 installers use the original appearance; customizable themes, the unified logo, and the latest pane fitting improvements are available in source and will ship in the next preview._
+_Muxyard v0.1.1 with labeled demo data. Five themes, unified branding, and terminals that make the most of your screen._
 
 ## Keep the sessions. Lose the window hunting.
 
@@ -23,6 +23,7 @@ _Current source preview with labeled demo data. Published v0.1.0 installers use 
 - **Click into the work.** Switch windows and panes with the mouse. Create sessions, add windows with Ctrl+T, split panes, and zoom without memorizing every tmux prefix.
 - **Give terminals the space.** Collapse the management panels or enter focus mode. Compact window tabs keep navigation within reach.
 - **Find your coding tools.** Detect Claude Code, Codex, OpenCode, Gemini, and Aider when tmux reports their executable names. Interact in the real terminal.
+- **Stay up to date.** Check for releases from any view, get a compact reminder, and choose when to install. Optional background downloads never force a restart.
 - **Make it yours.** Five light/dark palettes, system appearance, and per-palette accent and terminal color customization. Changes preserve live connections and scrollback.
 - **Close the app and come back.** Muxyard releases its own clients. Tmux keeps responsibility for sessions and process lifetime.
 
@@ -37,7 +38,7 @@ Choose your operating system and processor on the [website](https://xiaoguang.wa
 | Windows x64         | EXE installer | Unsigned preview; remote tmux over system OpenSSH          |
 | Linux x64           | AppImage, DEB | Built on Ubuntu 24.04; other distributions need validation |
 
-Install tmux for local sessions on macOS/Linux. Remote machines need SSH and tmux, with working key authentication. Windows does not include local tmux or WSL integration. Mac and Windows previews can trigger OS trust warnings. Automatic updates are not implemented.
+Install tmux for local sessions on macOS/Linux. Remote machines need SSH and tmux, with working key authentication. Windows does not include local tmux or WSL integration. Mac and Windows previews can trigger OS trust warnings. Version 0.1.1 adds automatic update checks and in-app reminders. Windows NSIS and Linux AppImage installations can download updates in the app and restart to install. Current ad-hoc signed Mac builds use a DMG download; DEB installations use your package manager. See [update behavior](docs/updates.md).
 
 ## Quick start
 

@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { hashFile, updateManifests, validateUpdateMetadata } from './update-metadata.mjs'
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const tag = process.env.RELEASE_TAG
@@ -20,12 +20,13 @@ const actual = readdirSync(directory)
 for (const name of expected) {
   if (!actual.includes(name)) throw new Error(`Missing installer: ${name}`)
 }
-const hashes = expected.map((name) => {
-  const hash = createHash('sha256')
-    .update(readFileSync(join(directory, name)))
-    .digest('hex')
-  return `${hash}  ${name}`
-})
+await validateUpdateMetadata(directory, version)
+expected.push(
+  ...updateManifests,
+  ...actual.filter((name) => expected.some((installer) => name === `${installer}.blockmap`))
+)
+const hashes = []
+for (const name of expected) hashes.push(`${await hashFile(join(directory, name))}  ${name}`)
 writeFileSync(join(directory, 'SHA256SUMS'), hashes.join('\n') + '\n')
 function gh(args) {
   const result = spawnSync('gh', args, { encoding: 'utf8' })

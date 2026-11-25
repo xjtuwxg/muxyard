@@ -1,8 +1,27 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DesktopAPI, TerminalEvent, PaneEvent } from '../shared/types'
+import type { DesktopAPI, TerminalEvent, PaneEvent, UpdateState } from '../shared/types'
 
 const api: DesktopAPI = {
   platform: process.platform,
+  updates: {
+    get: () => ipcRenderer.invoke('updates:get'),
+    check: () => ipcRenderer.invoke('updates:check'),
+    configure: (preferences) => ipcRenderer.invoke('updates:configure', preferences),
+    dismiss: () => ipcRenderer.invoke('updates:dismiss'),
+    openRelease: () => ipcRenderer.invoke('updates:release'),
+    download: () => ipcRenderer.invoke('updates:download'),
+    install: () => ipcRenderer.invoke('updates:install'),
+    subscribe: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: UpdateState): void =>
+        listener(state)
+      ipcRenderer.on('updates:state', handler)
+      return () => ipcRenderer.removeListener('updates:state', handler)
+    },
+    onOpen: (listener) => {
+      ipcRenderer.on('updates:open', listener)
+      return () => ipcRenderer.removeListener('updates:open', listener)
+    }
+  },
   hosts: {
     list: () => ipcRenderer.invoke('hosts:list'),
     save: (host) => ipcRenderer.invoke('hosts:save', host),

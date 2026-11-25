@@ -2357,3 +2357,139 @@ h1 > span {
     transition: none;
   }
 }
+/* Keep update controls available without adding another terminal toolbar row. */
+.updates-button {
+  position: relative;
+}
+.update-dot {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.update-notice {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  max-width: 360px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px #0003;
+}
+.update-notice > button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.update-notice strong,
+.update-notice small {
+  display: block;
+}
+.update-notice small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+.updates-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.updates-panel h2,
+.updates-panel p {
+  margin: 0;
+}
+.update-status {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.updates-panel progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.update-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.update-explanation {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.update-preferences {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.update-preferences legend {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.update-preferences label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 0;
+}
+.modal .update-preferences input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+}
+.update-footnote {
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.update-error {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.update-notes {
+  font-size: 12px;
+}
+.update-notes summary {
+  cursor: pointer;
+}
+.update-notes pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow-y: auto;
+  font: inherit;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.updates-modal {
+  width: 560px;
+}

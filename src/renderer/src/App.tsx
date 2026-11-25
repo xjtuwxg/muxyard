@@ -42,6 +42,7 @@ import TerminalView from './TerminalView'
 import PaneWorkspace from './PaneWorkspace'
 import SSHImportDialog from './SSHImportDialog'
 import AppearancePanel from './AppearancePanel'
+import UpdatesPanel, { useUpdates, UpdatesButton, UpdateNotice } from './UpdatesPanel'
 import { demoHosts, demoSnapshots } from './demo'
 
 const api = window.muxyard
@@ -118,9 +119,10 @@ export default function App() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [selectedPanes, setSelectedPanes] = useState<Record<string, string>>({})
-  const [modal, setModal] = useState<'host' | 'help' | 'import' | 'session' | 'appearance' | null>(
-    null
-  )
+  const [modal, setModal] = useState<
+    'host' | 'help' | 'import' | 'session' | 'appearance' | 'updates' | null
+  >(null)
+  const updateState = useUpdates(() => setModal('updates'))
   const [paneMode, setPaneMode] = useState(true)
   const [layout, setLayout] = useState<TerminalLayout>(initialTerminalLayout)
   const [focusRequest, setFocusRequest] = useState(0)
@@ -668,6 +670,7 @@ export default function App() {
             <strong>{activeTab ? activeTab.session.name : 'Overview'}</strong>
           </div>
           <div className="topbar-actions">
+            <UpdatesButton state={updateState} onOpen={() => setModal('updates')} />
             <button
               className="icon-button"
               aria-label="Appearance"
@@ -1056,6 +1059,7 @@ export default function App() {
               {windowButtons}
             </div>
             <div className="focus-actions">
+              <UpdatesButton state={updateState} onOpen={() => setModal('updates')} />
               <button
                 className="icon-button"
                 aria-label="Appearance"
@@ -1127,6 +1131,7 @@ export default function App() {
               <span className="toolbar-status">{activeTab.status}</span>
             </div>
             <div>
+              <UpdatesButton state={updateState} onOpen={() => setModal('updates')} />
               <button
                 className="icon-button"
                 aria-label="Appearance"
@@ -1383,6 +1388,9 @@ export default function App() {
         </footer>
       </main>
 
+      {modal !== 'updates' && (
+        <UpdateNotice state={updateState} onOpen={() => setModal('updates')} />
+      )}
       {modal && (
         <div
           className="modal-overlay"
@@ -1391,7 +1399,7 @@ export default function App() {
           }}
         >
           <section
-            className={`modal ${modal === 'appearance' ? 'appearance-modal' : ''}`}
+            className={`modal ${modal === 'appearance' ? 'appearance-modal' : modal === 'updates' ? 'updates-modal' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
@@ -1403,7 +1411,9 @@ export default function App() {
             >
               <X size={18} />
             </button>
-            {modal === 'appearance' ? (
+            {modal === 'updates' ? (
+              <UpdatesPanel state={updateState} />
+            ) : modal === 'appearance' ? (
               <AppearancePanel />
             ) : modal === 'import' && api ? (
               <SSHImportDialog

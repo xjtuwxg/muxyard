@@ -6,9 +6,145 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import type { UpdateState } from '../../src/shared/types'
 
 const rgb = (hex: string): string =>
   'rgb(' + [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16)).join(', ') + ')'
+
+test('software updates offer manual fallback, reminders, background download and explicit restart', async () => {
+  const data = await mkdtemp(join(tmpdir(), 'muxyard-update-ui-'))
+  let app: ElectronApplication | undefined
+  try {
+    app = await launch(data)
+    const page = await app.firstWindow()
+    await expect(page.getByText('Pick up where you left off.')).toBeVisible()
+    await app.evaluate(({ ipcMain, BrowserWindow, app }) => {
+      let state: UpdateState = {
+        currentVersion: app.getVersion(),
+        status: 'idle',
+        installation: {
+          supported: false,
+          reason:
+            'This macOS build is ad-hoc signed. Download the DMG and replace Muxyard in Applications.'
+        },
+        preferences: { automaticChecks: true, automaticDownload: false, includePrereleases: false }
+      }
+      const emit = (): UpdateState => {
+        BrowserWindow.getAllWindows()[0].webContents.send('updates:state', state)
+        return state
+      }
+      for (const action of [
+        'get',
+        'check',
+        'download',
+        'install',
+        'release',
+        'configure',
+        'dismiss'
+      ])
+        ipcMain.removeHandler(`updates:${action}`)
+      ipcMain.handle('updates:get', () => state)
+      ipcMain.handle('updates:check', () => {
+        state = {
+          ...state,
+          status: 'available',
+          release: {
+            version: '99.0.0',
+            tag: 'v99.0.0',
+            url: 'https://github.com/xjtuwxg/muxyard/releases/tag/v99.0.0',
+            notes: 'A newer release. <script>not executable</script>'
+          },
+          checkedAt: Date.now()
+        }
+        return emit()
+      })
+      ipcMain.handle('updates:release', () => {
+        process.env.MUXYARD_TEST_RELEASE_OPENED = 'yes'
+      })
+      ipcMain.handle('updates:install', () => {
+        process.env.MUXYARD_TEST_UPDATE_INSTALLED = 'yes'
+      })
+      ipcMain.handle('updates:dismiss', () => {
+        state.dismissedVersion = state.release?.version
+        return emit()
+      })
+      ipcMain.handle('updates:configure', (_event, patch) => {
+        state.preferences = { ...state.preferences, ...patch }
+        return emit()
+      })
+      ipcMain.handle('updates:download', () => {
+        state = {
+          ...state,
+          status: 'ready',
+          progress: 100,
+          installation: {
+            supported: true,
+            reason: 'Download in the background. Restart when ready.'
+          }
+        }
+        return emit()
+      })
+      emit()
+    })
+    await page.getByRole('button', { name: 'Software updates' }).filter({ visible: true }).click()
+    await page.getByRole('button', { name: 'Check for updates', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Version 99.0.0 is available.')
+    await expect(dialog).toContainText('ad-hoc signed')
+    await expect(dialog.getByRole('button', { name: 'Download update', exact: true })).toHaveCount(
+      0
+    )
+    await dialog.getByRole('button', { name: 'View downloads' }).click()
+    expect(await app.evaluate(() => process.env.MUXYARD_TEST_RELEASE_OPENED)).toBe('yes')
+    await dialog.getByText('Release notes', { exact: true }).click()
+    await expect(dialog.locator('pre')).toContainText('<script>not executable</script>')
+    await page.getByRole('button', { name: 'Close dialog' }).click()
+    await expect(page.getByRole('complementary', { name: 'Update available' })).toBeVisible()
+    await page.getByRole('button', { name: 'Dismiss update reminder' }).click()
+    await expect(page.locator('.update-notice')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Explore demo', exact: true }).first().click()
+    await page.locator('.session-card').filter({ hasText: 'atlas-api' }).click()
+    await page.getByRole('button', { name: 'Enter focus mode' }).click()
+    const terminal = page.locator('.terminal-view')
+    await expect(terminal).toBeVisible()
+    const bounds = await terminal.boundingBox()
+    await app.evaluate(({ BrowserWindow, app }) => {
+      BrowserWindow.getAllWindows()[0].webContents.send('updates:state', {
+        currentVersion: app.getVersion(),
+        status: 'available',
+        installation: {
+          supported: true,
+          reason: 'Download in the background. Restart when ready.'
+        },
+        preferences: { automaticChecks: true, automaticDownload: false, includePrereleases: false },
+        release: {
+          version: '99.0.1',
+          tag: 'v99.0.1',
+          url: 'https://github.com/xjtuwxg/muxyard/releases/tag/v99.0.1',
+          notes: ''
+        }
+      })
+    })
+    await expect(page.locator('.update-notice')).toContainText('99.0.1')
+    expect(await terminal.boundingBox()).toEqual(bounds)
+    await page.getByRole('button', { name: 'Software updates' }).filter({ visible: true }).click()
+    await page.getByRole('button', { name: 'Download update', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Restart and install' })).toBeVisible()
+    expect(await app.evaluate(() => process.env.MUXYARD_TEST_UPDATE_INSTALLED)).toBeUndefined()
+    await page.screenshot({ path: join(tmpdir(), 'muxyard-updates.png') })
+    await page.getByRole('button', { name: 'Restart and install' }).click()
+    expect(await app.evaluate(() => process.env.MUXYARD_TEST_UPDATE_INSTALLED)).toBe('yes')
+    await page.getByRole('button', { name: 'Close dialog' }).click()
+    await expect(terminal).toBeVisible()
+  } catch (error) {
+    await captureFailure(app)
+    throw error
+  } finally {
+    await app?.close()
+    await rm(data, { recursive: true, force: true })
+  }
+})
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 

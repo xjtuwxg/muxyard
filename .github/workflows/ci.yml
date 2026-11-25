@@ -63,7 +63,7 @@ jobs:
         run: npm run test:ui
       - name: Desktop UI smoke tests (Windows)
         if: runner.os == 'Windows'
-        run: npm run test:ui -- --grep 'desktop demo|SSH import|appearance presets'
+        run: npm run test:ui -- --grep 'desktop demo|SSH import|appearance presets|software updates'
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

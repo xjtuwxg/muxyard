@@ -1,10 +1,13 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, net, shell } from 'electron'
 import { join, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HostStore, sshAliases, importAliases } from './hosts'
 import { actionArgs, discover, runTmux, validateHost, createSession } from './tmux'
 import { PaneConnections } from './panes'
 import { Terminals } from './terminals'
+import { Updates } from './updates'
+import { createUpdateInstaller } from './update-installer'
+import { version } from '../../package.json'
 import type { Host, TmuxAction, NewSession } from '../shared/types'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
@@ -21,6 +24,7 @@ let window: BrowserWindow | null = null
 let terminals: Terminals
 let hosts: HostStore
 let panes: PaneConnections
+let updates: Updates
 
 function registerIPC(): void {
   const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): void => {
@@ -37,6 +41,13 @@ function registerIPC(): void {
       return fn(...args)
     })
   }
+  handle('updates:get', () => updates.get())
+  handle('updates:check', () => updates.check())
+  handle('updates:configure', (preferences) => updates.configure(preferences))
+  handle('updates:dismiss', () => updates.dismiss())
+  handle('updates:release', () => shell.openExternal(updates.releaseURL()))
+  handle('updates:download', () => updates.download())
+  handle('updates:install', () => updates.install())
   handle('hosts:list', () => hosts.list())
   handle('hosts:save', (host: Host) => hosts.save(host))
   handle('hosts:remove', (id: string) => hosts.remove(id))
@@ -175,6 +186,16 @@ app
     panes = new PaneConnections((event) => {
       if (window && !window.isDestroyed()) window.webContents.send('panes:event', event)
     })
+    updates = new Updates(
+      version,
+      join(app.getPath('userData'), 'updates.json'),
+      createUpdateInstaller((error) => updates?.installationError(error)),
+      (state) => {
+        if (window && !window.isDestroyed()) window.webContents.send('updates:state', state)
+      },
+      net.fetch.bind(net) as typeof fetch
+    )
+    await updates.load()
     registerIPC()
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
@@ -194,10 +215,26 @@ app
             { role: 'togglefullscreen' }
           ]
         },
-        { role: 'windowMenu' }
+        { role: 'windowMenu' },
+        {
+          label: 'Help',
+          submenu: [
+            {
+              label: 'Check for Updates…',
+              click: () => {
+                if (window) {
+                  window.show()
+                  window.webContents.send('updates:open')
+                } else void createWindow().then(() => window?.webContents.send('updates:open'))
+                void updates.check()
+              }
+            }
+          ]
+        }
       ])
     )
     await createWindow()
+    if (app.isPackaged) updates.start()
     app.on('activate', () => {
       if (!window) void createWindow()
     })
@@ -210,6 +247,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 app.on('before-quit', () => {
+  updates?.dispose()
   terminals?.closeAll()
   panes?.closeAll()
 })

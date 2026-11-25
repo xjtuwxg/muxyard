@@ -86,6 +86,17 @@ export interface TerminalEvent {
 
 export interface DesktopAPI {
   platform: string
+  updates: {
+    get(): Promise<UpdateState>
+    check(): Promise<UpdateState>
+    configure(preferences: Partial<UpdatePreferences>): Promise<UpdateState>
+    dismiss(): Promise<UpdateState>
+    openRelease(): Promise<void>
+    download(): Promise<UpdateState>
+    install(): Promise<void>
+    subscribe(listener: (state: UpdateState) => void): () => void
+    onOpen(listener: () => void): () => void
+  }
   hosts: {
     list(): Promise<Host[]>
     save(host: Host): Promise<Host[]>
@@ -125,6 +136,29 @@ export interface DesktopAPI {
     close(id: string): Promise<void>
     subscribe(listener: (event: PaneEvent) => void): () => void
   }
+}
+
+export interface UpdatePreferences {
+  automaticChecks: boolean
+  automaticDownload: boolean
+  includePrereleases: boolean
+}
+export interface UpdateRelease {
+  version: string
+  tag: string
+  url: string
+  notes: string
+}
+export interface UpdateState {
+  currentVersion: string
+  status: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error'
+  preferences: UpdatePreferences
+  installation: { supported: boolean; reason: string }
+  release?: UpdateRelease
+  checkedAt?: number
+  progress?: number
+  error?: string
+  dismissedVersion?: string
 }
 
 declare global {
