@@ -95,6 +95,14 @@ test('mouse actions target stable pane IDs and preserve the working directory', 
     ),
     ['split-window', '-h', '-t', '%3', '-c', pane.path]
   )
+  assert.deepEqual(
+    actionArgs({ type: 'new-window', sessionId: pane.sessionId, paneId: pane.id }, pane),
+    ['new-window', '-t', '$1:', '-c', pane.path]
+  )
+  assert.deepEqual(
+    actionArgs({ type: 'next-window', sessionId: pane.sessionId, paneId: pane.id }, pane),
+    ['next-window', '-t', '$1']
+  )
 })
 
 test('imports literal SSH aliases, skipping wildcard and negated patterns', () => {

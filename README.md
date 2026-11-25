@@ -14,6 +14,7 @@ No account. No cloud relay. No remote Muxyard daemon. Just your Mac, OpenSSH, an
 
 - Discover existing sessions, windows, and panes on your Mac or an SSH host.
 - Attach multiple sessions in terminal tabs, with full terminal input and output.
+- Create tmux windows with **Ctrl+T**, **Cmd+T**, or the **New window** button, then switch them in the dedicated window tab bar.
 - Display tmux splits as separate GUI terminal panels, with immediate mouse focus and input routed by pane ID.
 - Click to select a window or pane. Split side by side or top and bottom, or toggle pane zoom.
 - Search terminal scrollback with **Cmd+F** and copy selected text with **Cmd+C**.
@@ -94,11 +95,25 @@ The import button reads literal aliases in the main `~/.ssh/config` file. It ski
 
 ## Behavior to know
 
+**Sessions, windows, and panes stay distinct.** The top tab bar switches attached sessions. The **WINDOWS** row switches tmux windows inside the selected session; each window has its own panes. New windows inherit the selected pane's working directory and are created on the same host, socket, and session. Their processes keep running when you switch windows or detach Muxyard. Window creation and navigation work in both Pane view and Classic terminal. External window creation, renaming, and removal are reflected in the tabs, with control-mode updates in Pane view and discovery polling in Classic terminal.
+
+Attach an existing session before creating a window. These shortcuts apply to the attached workspace and do not run inside dialogs or text-entry forms:
+
+| Action                          | Shortcut        |
+| ------------------------------- | --------------- |
+| New tmux window                 | Ctrl+T or Cmd+T |
+| Next window                     | Ctrl+Tab        |
+| Previous window                 | Ctrl+Shift+Tab  |
+| Split into left and right panes | Cmd+D           |
+| Split into top and bottom panes | Cmd+Shift+D     |
+
+Plain Ctrl+D continues to reach the terminal program. Pane view also supports the tmux prefix sequences **Ctrl+B c** (new window), **Ctrl+B n/p** (next/previous window), **Ctrl+B %** (left/right split), **Ctrl+B "** (top/bottom split), and **Ctrl+B z** (zoom).
+
 **Existing tmux state is shared.** Selecting a window or pane can change what other clients of the same session see. An attached terminal can also affect tmux's layout sizing according to your configuration. Muxyard does not create grouped sessions or change global tmux options.
 
 **Pane view is the default.** Each pane has its own terminal surface, focus outline, scrollback, search, and copy controls. Click directly in a pane to focus it; typing is addressed to that pane without waiting for tmux selection to round-trip over SSH. Existing horizontal and vertical splits, including splits made by another tmux client, are reflected in the GUI. Panels remain inside the same application window; detachable macOS windows are not implemented.
 
-**Choose the right terminal mode.** Pane view uses tmux control mode and supports **Ctrl+B %**, **Ctrl+B "**, and **Ctrl+B z** for split and zoom. It restores the visible screen and up to 1,000 recent history lines at attachment, then streams live application bytes. It does not implement tmux's entire prefix-key table, tmux copy/choose overlays, or every historical terminal mode. Use **Classic terminal** for custom tmux bindings or a TUI that does not render correctly in pane view. Switching views leaves the underlying session running.
+**Choose the right terminal mode.** Pane view uses tmux control mode and implements the common window, split, and zoom prefix sequences listed above. It restores the visible screen and up to 1,000 recent history lines at attachment, then streams live application bytes. It does not implement tmux's entire prefix-key table, tmux copy/choose overlays, or every historical terminal mode. Use **Classic terminal** for custom tmux bindings or a TUI that does not render correctly in pane view. Switching views leaves the underlying session running.
 
 **Mouse behavior is local to each view.** Pane view focus works without changing your tmux mouse configuration. Classic terminal follows your existing tmux configuration; use `set -g mouse on` yourself if you want direct pane clicks there. Hold **Shift** while dragging to select terminal text when an application is using mouse reporting.
 

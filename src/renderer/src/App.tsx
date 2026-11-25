@@ -106,6 +106,7 @@ export default function App() {
   const [agentFilter, setAgentFilter] = useState(false)
   const generation = useRef(0)
   const searching = useRef<HTMLInputElement>(null)
+  const shortcutHandler = useRef<(event: KeyboardEvent) => void>(() => {})
   const activeTab = tabs.find((tab) => tab.key === activeKey)
   const host = hosts.find((item) => item.id === selectedHost) ?? hosts[0]
   const visibleHosts = hosts.filter(
@@ -132,6 +133,18 @@ export default function App() {
       : undefined) ??
     activeSession?.panes.find((pane) => pane.active && pane.windowActive) ??
     activeSession?.panes[0]
+  const windows = [...new Set(activeSession?.panes.map((pane) => pane.windowId) ?? [])]
+    .map((id) => {
+      const panes = activeSession!.panes.filter((pane) => pane.windowId === id)
+      return {
+        id,
+        name: panes[0].windowName,
+        index: panes[0].windowIndex,
+        panes,
+        selected: id === activePane?.windowId
+      }
+    })
+    .sort((left, right) => left.index - right.index)
   const shownSessions = currentSessions.filter(
     (session) =>
       `${session.name} ${session.panes.map((pane) => `${pane.path} ${pane.command} ${pane.agent ?? ''}`).join(' ')}`
@@ -221,6 +234,8 @@ export default function App() {
 
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => {
+      shortcutHandler.current(event)
+      if (event.defaultPrevented) return
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault()
         searching.current?.focus()
@@ -230,8 +245,8 @@ export default function App() {
         setNotice('')
       }
     }
-    window.addEventListener('keydown', listener)
-    return () => window.removeEventListener('keydown', listener)
+    window.addEventListener('keydown', listener, true)
+    return () => window.removeEventListener('keydown', listener, true)
   }, [])
 
   function toggleDemo(): void {
@@ -286,6 +301,10 @@ export default function App() {
         )
       if (type === 'zoom')
         setNotice('This is a sample workspace. In the desktop app, this toggles tmux pane zoom.')
+      if (['new-window', 'next-window', 'previous-window'].includes(type))
+        setNotice(
+          'This is a sample workspace. Attach a real session to create and navigate tmux windows.'
+        )
       return
     }
     if (!api) return
@@ -314,6 +333,36 @@ export default function App() {
     } finally {
       setPending(false)
     }
+  }
+
+  shortcutHandler.current = (event) => {
+    if (modal || event.isComposing || event.altKey) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('input, textarea, [contenteditable="true"]') && !target.closest('.xterm'))
+      return
+    let type: TmuxAction['type'] | undefined
+    let direction: 'horizontal' | 'vertical' | undefined
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 't')
+      type = 'new-window'
+    else if (event.ctrlKey && !event.metaKey && event.key === 'Tab')
+      type = event.shiftKey ? 'previous-window' : 'next-window'
+    else if (event.metaKey && !event.ctrlKey && event.key.toLowerCase() === 'd') {
+      type = 'split'
+      direction = event.shiftKey ? 'vertical' : 'horizontal'
+    }
+    if (!type) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if (event.repeat) return
+    if (!activeTab || !activeSession || !activePane) {
+      setNotice('Attach a tmux session first to create windows and panes.')
+      return
+    }
+    if (!demo && activeTab.status !== 'Attached') {
+      setNotice('Wait for the session to attach, or reattach it before changing its windows.')
+      return
+    }
+    void action(activeTab.host, activeSession, activePane, type, direction)
   }
 
   async function importHosts(): Promise<void> {
@@ -879,7 +928,7 @@ export default function App() {
               <button
                 className="subtle-button"
                 disabled={pending || !activePane}
-                title="Split selected pane side by side"
+                title="Split selected pane side by side (⌘D)"
                 onClick={() =>
                   activePane &&
                   void action(activeTab.host, activeSession, activePane, 'split', 'horizontal')
@@ -890,7 +939,7 @@ export default function App() {
               <button
                 className="icon-button"
                 disabled={pending || !activePane}
-                title="Split selected pane top and bottom"
+                title="Split selected pane top and bottom (⌘⇧D)"
                 aria-label="Split top and bottom"
                 onClick={() =>
                   activePane &&
@@ -934,6 +983,48 @@ export default function App() {
               </button>
             </div>
           </div>
+        )}
+
+        {activeTab && activeSession && (
+          <nav className="window-tabbar" aria-label="Tmux windows">
+            <span className="window-tabbar-label">WINDOWS</span>
+            <div className="window-tabs" role="tablist" aria-label="Tmux windows">
+              {windows.map((item) => (
+                <button
+                  key={item.id}
+                  role="tab"
+                  aria-selected={item.selected}
+                  aria-label={`Window ${item.index}: ${item.name}`}
+                  className={`window-tab ${item.selected ? 'selected' : ''}`}
+                  onClick={() =>
+                    void action(
+                      activeTab.host,
+                      activeSession,
+                      item.panes.find((pane) => pane.active) ?? item.panes[0],
+                      'select'
+                    )
+                  }
+                >
+                  <span className="window-index">{item.index}</span>
+                  <span className="window-tab-name">{item.name}</span>
+                  <small>
+                    {item.panes.length} {item.panes.length === 1 ? 'pane' : 'panes'}
+                  </small>
+                </button>
+              ))}
+            </div>
+            <button
+              className="new-window-button"
+              aria-label="New tmux window"
+              title="New tmux window (Ctrl+T / ⌘T)"
+              disabled={pending || !activePane || (!demo && activeTab.status !== 'Attached')}
+              onClick={() =>
+                activePane && void action(activeTab.host, activeSession, activePane, 'new-window')
+              }
+            >
+              <Plus size={14} /> New window <kbd>⌃T</kbd>
+            </button>
+          </nav>
         )}
 
         <div className={`terminal-workspace ${!activeKey ? 'hidden' : ''}`}>
@@ -1063,7 +1154,7 @@ export default function App() {
           <span>
             {activeKey
               ? paneMode && !demo
-                ? 'Click any pane to focus · Ctrl+B % to split'
+                ? 'Ctrl+T new window · ⌘D split · Ctrl+Tab switch windows'
                 : 'Shift + drag to select text when tmux mouse mode is on'
               : '⌘ K  Find a session'}
             <i />
@@ -1135,7 +1226,8 @@ export default function App() {
                     pane to select it, and use the toolbar to split or zoom. Pane view renders
                     separate clickable terminals without changing your tmux mouse configuration.
                     Classic terminal keeps all your tmux bindings and overlays. Pane view supports
-                    Ctrl+B %, ", and z; use Classic terminal for other custom prefix bindings.
+                    Ctrl+B c, n, p, %, ", and z; use Classic terminal for other custom prefix
+                    bindings.
                   </p>
                   <p>
                     <strong>Shared tmux state.</strong> Selecting a window or pane also affects
@@ -1147,6 +1239,18 @@ export default function App() {
                     executable names reported by tmux. A process shown as node or python may not be
                     recognized. Working, waiting, and completed states need future hooks.
                   </p>
+                  <div className="shortcut-row">
+                    <span>New tmux window</span>
+                    <kbd>Ctrl+T / ⌘T</kbd>
+                  </div>
+                  <div className="shortcut-row">
+                    <span>Next / previous window</span>
+                    <kbd>Ctrl+Tab / Ctrl+Shift+Tab</kbd>
+                  </div>
+                  <div className="shortcut-row">
+                    <span>Split side by side / top and bottom</span>
+                    <kbd>⌘D / ⌘⇧D</kbd>
+                  </div>
                   <div className="shortcut-row">
                     <span>Find a session</span>
                     <kbd>⌘ K</kbd>

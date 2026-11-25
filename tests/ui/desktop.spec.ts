@@ -161,6 +161,116 @@ test('desktop connects to a real isolated tmux session and keeps it after detach
   }
 })
 
+test('creates and navigates real tmux windows with buttons, shortcuts, panes, and external updates', async () => {
+  const data = await mkdtemp(join(tmpdir(), 'muxyard windows-'))
+  const socket = `muxyard-windows-${process.pid}-${Date.now()}`
+  const tmux = (args: string[]): string =>
+    execFileSync('tmux', ['-L', socket, ...args], { encoding: 'utf8' })
+  tmux([
+    '-f',
+    '/dev/null',
+    'new-session',
+    '-d',
+    '-s',
+    'ui-windows',
+    '-n',
+    'original',
+    '-c',
+    data,
+    '-x',
+    '100',
+    '-y',
+    '30',
+    '/bin/sh'
+  ])
+  tmux(['set-option', '-g', 'default-shell', '/bin/sh'])
+  tmux(['new-session', '-d', '-s', 'unrelated', '/bin/sh'])
+  const active = (format: string): string =>
+    tmux(['display-message', '-p', '-t', 'ui-windows:', format]).trim()
+  let app: ElectronApplication | undefined
+  try {
+    app = await launch(data)
+    const page = await app.firstWindow()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.getByRole('button', { name: 'Add machine', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Local socket' }).click()
+    await page.getByLabel('Display name').fill('Window test')
+    await page.getByLabel('Tmux socket name').fill(socket)
+    await page.getByRole('dialog').getByRole('button', { name: 'Add machine', exact: true }).click()
+    await page.locator('.session-card').filter({ hasText: 'ui-windows' }).click()
+    await expect(page.locator('.toolbar-status')).toHaveText('Attached')
+    await expect(page.getByRole('tab')).toHaveCount(1)
+    await page.locator('.gui-pane:visible .gui-pane-header strong').click()
+    await page.keyboard.press('Control+t')
+    await expect(page.getByRole('tab')).toHaveCount(2)
+    await expect.poll(() => active('#{window_index}')).toBe('1')
+    await expect(page.locator('.window-tab[aria-selected="true"]')).toContainText('1')
+    expect(active('#{pane_current_path}')).toBe(await realpath(data))
+    const secondWindow = active('#{window_id}')
+    const secondPane = active('#{pane_id}')
+    await page.locator(`.gui-pane[data-pane-id="${secondPane}"] .gui-pane-header strong`).click()
+    await page.keyboard.type("printf 'WINDOW_%s\\n' 'INPUT_OK'")
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() => tmux(['capture-pane', '-p', '-t', secondPane]))
+      .toContain('WINDOW_INPUT_OK')
+    await page.keyboard.press('Meta+d')
+    await expect(page.locator('.gui-pane:visible')).toHaveCount(2)
+    await page.keyboard.press('Meta+Shift+d')
+    await expect(page.locator('.gui-pane:visible')).toHaveCount(3)
+    await page.getByRole('tab', { name: 'Window 0: original', exact: true }).click()
+    await expect(
+      page.getByRole('tab', { name: 'Window 0: original', exact: true })
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('.gui-pane:visible')).toHaveCount(1)
+    await page.keyboard.press('Control+Tab')
+    await expect.poll(() => active('#{window_id}')).toBe(secondWindow)
+    await expect(page.locator('.gui-pane:visible')).toHaveCount(3)
+    await page.keyboard.press('Control+Shift+Tab')
+    await expect(
+      page.getByRole('tab', { name: 'Window 0: original', exact: true })
+    ).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('Meta+t')
+    await expect(page.getByRole('tab')).toHaveCount(3)
+    await page.getByRole('button', { name: 'New tmux window', exact: true }).click()
+    await expect(page.getByRole('tab')).toHaveCount(4)
+    await page.locator('.gui-pane:visible textarea').press('Control+b')
+    await page.keyboard.type('c')
+    await expect(page.getByRole('tab')).toHaveCount(5)
+    await page.screenshot({ path: '/private/tmp/muxyard-windows.png' })
+    tmux(['new-window', '-t', 'ui-windows:', '-n', 'external-window', '/bin/sh'])
+    await expect(page.getByRole('tab')).toHaveCount(6)
+    await expect(page.getByRole('tab', { name: /external-window/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    const externalWindow = active('#{window_id}')
+    tmux(['rename-window', '-t', externalWindow, 'renamed-window'])
+    await expect(page.getByRole('tab', { name: /renamed-window/ })).toBeVisible()
+    tmux(['kill-window', '-t', externalWindow])
+    await expect(page.getByRole('tab')).toHaveCount(5)
+    await page.getByRole('button', { name: 'Classic terminal', exact: true }).click()
+    await expect(page.locator('.toolbar-status')).toHaveText('Attached')
+    await page.locator('.terminal-container textarea').focus()
+    await page.keyboard.press('Control+t')
+    await expect(page.getByRole('tab')).toHaveCount(6)
+    expect(
+      tmux(['list-windows', '-t', 'unrelated', '-F', '#{window_id}']).trim().split('\n')
+    ).toHaveLength(1)
+    await page.getByRole('button', { name: 'Detach', exact: true }).click()
+    await expect.poll(() => active('#{session_attached}')).toBe('0')
+    expect(
+      tmux(['list-windows', '-t', 'ui-windows', '-F', '#{window_id}']).trim().split('\n')
+    ).toHaveLength(6)
+    expect(errors).toEqual([])
+  } finally {
+    await app?.close()
+    tmux(['kill-server'])
+    await rm(data, { recursive: true, force: true })
+  }
+})
+
 test('SSH import previews aliases without connecting, checks on demand, and imports only selected hosts', async () => {
   const data = await mkdtemp(join(tmpdir(), 'muxyard-import-ui-'))
   let app: ElectronApplication | undefined

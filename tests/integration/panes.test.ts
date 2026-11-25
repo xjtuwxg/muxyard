@@ -97,9 +97,25 @@ test(
         ).trim(),
         '1'
       )
+      await client.action({ type: 'new-window', sessionId: session.id, paneId: second })
+      const updated = (await discover(host)).sessions[0]
+      assert.equal(updated.windows, 2)
+      const newPane = updated.panes.find((pane) => pane.windowActive)!
+      assert.notEqual(newPane.windowId, session.panes[0].windowId)
+      assert.equal(newPane.path, session.panes[0].path)
+      await client.action({ type: 'previous-window', sessionId: session.id, paneId: newPane.id })
+      assert.equal(
+        (await discover(host)).sessions[0].panes.find((pane) => pane.windowActive)!.windowId,
+        session.panes[0].windowId
+      )
+      await client.action({ type: 'next-window', sessionId: session.id, paneId: first })
+      assert.equal(
+        (await discover(host)).sessions[0].panes.find((pane) => pane.windowActive)!.windowId,
+        newPane.windowId
+      )
       connections.close('panes-client')
       await until(async () => (await discover(host)).sessions[0].attached === 0)
-      assert.equal((await discover(host)).sessions[0].panes.length, 2)
+      assert.equal((await discover(host)).sessions[0].panes.length, 3)
     } finally {
       connections.closeAll()
       await runTmux(host, ['kill-server']).catch(() => {})

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { SearchAddon } from '@xterm/addon-search'
 import { Copy, Maximize2, Search, X } from 'lucide-react'
-import type { DesktopAPI, Pane, PaneEvent, TmuxSession } from '../../shared/types'
+import type { DesktopAPI, Pane, PaneEvent, TmuxSession, TmuxAction } from '../../shared/types'
+
+type PaneAction = Exclude<TmuxAction['type'], 'select'>
 import '@xterm/xterm/css/xterm.css'
 
 interface Props {
@@ -14,7 +16,7 @@ interface Props {
   onStatus: (status: string) => void
   onSession: (session: TmuxSession) => void
   onConnection: (id?: string) => void
-  onAction: (pane: Pane, type: 'split' | 'zoom', direction?: 'horizontal' | 'vertical') => void
+  onAction: (pane: Pane, type: PaneAction, direction?: 'horizontal' | 'vertical') => void
 }
 
 export default function PaneWorkspace(props: Props) {
@@ -158,9 +160,7 @@ export default function PaneWorkspace(props: Props) {
     <div className="pane-workspace" style={{ display: props.visible ? 'flex' : 'none' }}>
       <div className="pane-workspace-caption">
         <span>LIVE PANES</span>
-        <span>
-          Click a pane to focus · Ctrl+B % to split · Classic terminal for custom bindings
-        </span>
+        <span>Click to focus · Ctrl+T new window · ⌘D split · Ctrl+Tab switch windows</span>
       </div>
       {error && (
         <div className="pane-connection-error" role="status">
@@ -230,7 +230,7 @@ function PaneSurface({
   pane: Pane
   active: boolean
   register: (listener: (event: PaneEvent) => void) => () => void
-  onAction: (type: 'split' | 'zoom', direction?: 'horizontal' | 'vertical') => void
+  onAction: (type: PaneAction, direction?: 'horizontal' | 'vertical') => void
   onError: (message: string) => void
 }) {
   const element = useRef<HTMLDivElement>(null)
@@ -308,9 +308,12 @@ function PaneSurface({
         if (key === '%') handlers.current.onAction('split', 'horizontal')
         else if (key === '"') handlers.current.onAction('split', 'vertical')
         else if (key === 'z') handlers.current.onAction('zoom')
+        else if (key === 'c') handlers.current.onAction('new-window')
+        else if (key === 'n') handlers.current.onAction('next-window')
+        else if (key === 'p') handlers.current.onAction('previous-window')
         else
           handlers.current.onError(
-            'This tmux prefix binding is available in Classic terminal. Pane view supports Ctrl+B %, ", and z.'
+            'This binding is available in Classic terminal. Pane view supports Ctrl+B c, n, p, %, ", and z.'
           )
         return
       }

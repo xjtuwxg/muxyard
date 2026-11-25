@@ -68,6 +68,7 @@ export interface Snapshot {
 }
 
 export type TmuxAction =
+  | { type: 'new-window' | 'next-window' | 'previous-window'; sessionId: string; paneId: string }
   | { type: 'select'; sessionId: string; paneId: string }
   | { type: 'split'; sessionId: string; paneId: string; direction: 'horizontal' | 'vertical' }
   | { type: 'zoom'; sessionId: string; paneId: string }

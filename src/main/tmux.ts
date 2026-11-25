@@ -203,6 +203,12 @@ export async function discover(host: Host): Promise<Snapshot> {
 
 export function actionArgs(action: TmuxAction, pane: Pane): string[] {
   switch (action.type) {
+    case 'new-window':
+      return ['new-window', '-t', `${pane.sessionId}:`, '-c', pane.path]
+    case 'next-window':
+      return ['next-window', '-t', pane.sessionId]
+    case 'previous-window':
+      return ['previous-window', '-t', pane.sessionId]
     case 'select':
       return [
         'select-window',

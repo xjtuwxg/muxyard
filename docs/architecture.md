@@ -44,6 +44,8 @@ Local hosts and successfully connected SSH hosts refresh every eight seconds. Ot
 
 Classic terminal attachment and standalone pane actions verify current discovery state. Pane-view commands validate targets against their control connection's session membership and use stable IDs. Both views operate on the original session and never forcibly detach other clients. Window selection and pane selection remain shared tmux state.
 
+The window tab bar is derived from stable window IDs in the selected session snapshot and sorted by tmux window index. Selecting a window restores its active pane. New-window commands explicitly target the session and inherit the selected pane's working directory. Next/previous-window commands are scoped to the same session. Workspace shortcuts are handled during key-event capture so terminal widgets do not receive the reserved keystrokes; composing text and form/dialog inputs are excluded. Ctrl+D is deliberately passed through.
+
 ## Terminal transport and lifetime
 
 The interactive transport is a real PTY attached to a regular tmux client. Full-screen terminal programs, shell input, and existing tmux bindings pass through xterm.js. Local environment variables `TMUX` and `TMUX_PANE` are removed to avoid tmux's nested-session guard.
@@ -80,7 +82,7 @@ The control client's dimensions are updated with `refresh-client -C`. Pane termi
 
 ## Validation boundaries
 
-Unit tests cover metadata parsing, executable recognition, selective SSH import, argument quoting, destination validation, concurrent profile persistence, protocol framing, octal decoding, and capture ordering. Integration tests use isolated tmux servers to exercise both transports, separate pane streams, input routing, external splits, cursor hydration, zoom, and detach persistence. Electron UI tests cover direct mouse/keyboard focus, Ctrl+B splits, external layout synchronization, view switching, and selective import using simulated SSH outcomes without contacting real SSH hosts.
+Unit tests cover metadata parsing, executable recognition, selective SSH import, argument quoting, destination validation, concurrent profile persistence, protocol framing, octal decoding, and capture ordering. Integration tests use isolated tmux servers to exercise both transports, separate pane streams, input routing, window creation/navigation, external splits, cursor hydration, zoom, and detach persistence. Electron UI tests cover direct mouse/keyboard focus, window and pane shortcuts, separate window layouts, external window creation/rename/removal, view switching, and selective import using simulated SSH outcomes without contacting real SSH hosts. A separate session in the window tests verifies that new windows are created only in the intended session.
 
 Real remote servers, SSH jump hosts, non-default user shells, agent wrappers, large output streams, macOS sleep/wake, and long-duration sessions need additional validation before a general release.
 
