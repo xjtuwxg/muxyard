@@ -47,6 +47,8 @@ Outputs are under `release/`. These commands explicitly disable publishing. Buil
 
 The workflow uses the repository's built-in `GITHUB_TOKEN`; a personal access token is not required. Build jobs have read-only repository permission. Only the draft-release job has `contents: write`. Ensure Actions is enabled and repository or organization policy permits that job permission.
 
+The **Website** workflow refreshes public download links when a release is published. In the `github-pages` environment, selected deployment branches and tags must allow both the `main` branch and `v*` tags. A release-triggered job retains its tag ref even when the build checks out `main`; a main-only environment policy rejects that deployment. Configure these rules under repository **Settings → Environments → github-pages → Deployment branches and tags**.
+
 ## Create a release
 
 Commit and push your reviewed changes before creating the tag. The tag must exactly match `v` plus the version in `package.json` (currently `v0.1.1`).
