@@ -15,7 +15,7 @@ The workflow builds on macOS 15, macOS 15 Intel, Windows Server 2022, and Ubuntu
 
 Windows does not run tmux locally. Add an SSH machine running tmux on Linux or macOS. Windows OpenSSH Client must be installed at `%SystemRoot%\System32\OpenSSH\ssh.exe`; verify your SSH alias and host key in PowerShell before using Muxyard. WSL integration is not implemented. The application uses the OS-specific OpenSSH path, PATH separator, menu, and title bar.
 
-A DMG is the primary Mac download: open it and drag Muxyard into Applications. ZIP is useful for a portable app bundle and for future update support. The `.app` directory alone is suitable for local testing but should be archived for distribution. On Ubuntu, use `sudo apt install ./Muxyard-<version>-linux-x64.deb`. An AppImage needs executable permission and may require FUSE support on the target distribution.
+A DMG is the primary Mac download: open it and drag Muxyard into Applications. ZIP is useful for a portable app bundle and for future update support. The `.app` directory alone is suitable for local testing but should be archived for distribution. On Ubuntu, use `sudo apt install ./Muxyard-<version>-linux-amd64.deb`. An AppImage needs executable permission and may require FUSE support on the target distribution.
 
 ## Local builds
 

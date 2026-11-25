@@ -13,8 +13,8 @@ const expected = [
   `Muxyard-${version}-mac-x64.dmg`,
   `Muxyard-${version}-mac-x64.zip`,
   `Muxyard-${version}-win-x64.exe`,
-  `Muxyard-${version}-linux-x64.AppImage`,
-  `Muxyard-${version}-linux-x64.deb`
+  `Muxyard-${version}-linux-x86_64.AppImage`,
+  `Muxyard-${version}-linux-amd64.deb`
 ]
 const actual = readdirSync(directory)
 for (const name of expected) {
