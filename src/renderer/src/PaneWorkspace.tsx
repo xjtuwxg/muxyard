@@ -12,6 +12,7 @@ interface Props {
   hostId: string
   session: TmuxSession
   visible: boolean
+  focusRequest?: number
   selection?: { paneId: string; serial: number }
   onStatus: (status: string) => void
   onSession: (session: TmuxSession) => void
@@ -115,13 +116,18 @@ export default function PaneWorkspace(props: Props) {
       timer = setTimeout(() => {
         if (!container.current?.clientWidth || !container.current.clientHeight) return
         const verticalBands = new Set(panes.map((pane) => pane.top ?? 0)).size || 1
+        const headerHeight =
+          container.current.querySelector('.gui-pane-header')?.getBoundingClientRect().height ?? 24
         const cols = Math.min(
           1000,
-          Math.max(10, Math.floor((container.current.clientWidth - 20) / 7.83))
+          Math.max(10, Math.floor((container.current.clientWidth - 12) / 7.83))
         )
         const rows = Math.min(
           1000,
-          Math.max(5, Math.floor((container.current.clientHeight - 40 * verticalBands) / 19.5))
+          Math.max(
+            5,
+            Math.floor((container.current.clientHeight - (headerHeight + 8) * verticalBands) / 19.5)
+          )
         )
         const size = `${cols},${rows}`
         if (lastSize.current === size) return
@@ -199,6 +205,7 @@ export default function PaneWorkspace(props: Props) {
                   connectionId={id}
                   pane={pane}
                   active={activeId === pane.id && shown && props.visible}
+                  focusRequest={props.focusRequest}
                   register={(listener) => {
                     listeners.current.set(pane.id, listener)
                     return () => {
@@ -221,6 +228,7 @@ function PaneSurface({
   connectionId,
   pane,
   active,
+  focusRequest,
   register,
   onAction,
   onError
@@ -229,6 +237,7 @@ function PaneSurface({
   connectionId: string
   pane: Pane
   active: boolean
+  focusRequest?: number
   register: (listener: (event: PaneEvent) => void) => () => void
   onAction: (type: PaneAction, direction?: 'horizontal' | 'vertical') => void
   onError: (message: string) => void
@@ -391,8 +400,8 @@ function PaneSurface({
   }, [pane.width, pane.height])
 
   useEffect(() => {
-    if (active) instance.current?.terminal.focus()
-  }, [active])
+    if (active) requestAnimationFrame(() => instance.current?.terminal.focus())
+  }, [active, focusRequest])
 
   return (
     <>

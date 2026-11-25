@@ -1880,3 +1880,165 @@ h1 > span {
   font-size: 8px;
   margin-left: 4px;
 }
+
+/* Attached workspaces reserve the canvas for terminal content. */
+.has-terminal:not(.sidebar-visible) > .sidebar,
+.has-terminal:not(.inspector-visible) .pane-inspector,
+.has-terminal .topbar,
+.has-terminal .tabbar.single-session,
+.has-terminal .statusbar,
+.has-terminal .pane-workspace-caption {
+  display: none;
+}
+.has-terminal .workspace-toolbar {
+  order: -3;
+  height: 44px;
+  min-height: 44px;
+  padding: 5px 12px;
+  -webkit-app-region: drag;
+}
+.has-terminal:not(.sidebar-visible) .workspace-toolbar {
+  padding-left: 100px;
+}
+.has-terminal .workspace-toolbar button,
+.focus-toolbar button {
+  -webkit-app-region: no-drag;
+}
+.has-terminal .workspace-toolbar > div {
+  gap: 7px;
+  min-width: 0;
+}
+.has-terminal .workspace-toolbar strong {
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.has-terminal .toolbar-host {
+  display: none;
+}
+.has-terminal .tabbar {
+  order: -2;
+  min-height: 30px;
+}
+.has-terminal .tab-select {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.has-terminal .terminal-workspace {
+  order: 1;
+}
+.has-terminal .window-tabbar {
+  min-height: 32px;
+  gap: 8px;
+  padding: 0 10px;
+}
+.has-terminal .window-tab {
+  padding: 6px 9px;
+}
+.has-terminal .window-tabbar-label {
+  font-size: 7px;
+}
+.has-terminal .new-window-button {
+  padding: 4px 7px;
+  font-size: 9px;
+}
+.has-terminal .pane-layout {
+  margin: 4px;
+}
+.has-terminal .gui-pane-header {
+  height: 24px;
+}
+.has-terminal .gui-pane-header .icon-button {
+  padding: 3px;
+}
+.has-terminal .pane-screen-viewport {
+  margin: 4px;
+}
+.has-terminal .terminal-utility {
+  height: 26px;
+}
+.has-terminal .terminal-container {
+  margin: 6px 4px 4px 8px;
+}
+.focus-toolbar {
+  display: flex;
+  order: -4;
+  height: 44px;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px 0 100px;
+  background: #141d17;
+  border-bottom: 1px solid #304135;
+  -webkit-app-region: drag;
+}
+.focus-context {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10px;
+  color: #809b89;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.focus-context strong {
+  font-weight: 500;
+  color: #c1d7c7;
+}
+.focus-context > span {
+  color: #465f4e;
+}
+.focus-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.focus-exit-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #afcbb8;
+  padding: 5px 8px;
+  border: 1px solid #405d49;
+  border-radius: 4px;
+}
+.focus-exit-button:hover {
+  background: #293d30;
+}
+.focus-exit-button kbd {
+  color: #698d75;
+  font-size: 8px;
+  margin-left: 4px;
+}
+.is-focus > .sidebar,
+.is-focus .workspace-toolbar,
+.is-focus .tabbar,
+.is-focus .window-tabbar,
+.is-focus .pane-inspector,
+.is-focus .demo-banner {
+  display: none;
+}
+.is-focus .pane-layout {
+  margin: 2px;
+}
+.is-focus .gui-pane-header {
+  height: 20px;
+  border-bottom-color: #24392b;
+}
+.is-focus .gui-pane {
+  border-radius: 2px;
+}
+.is-focus .pane-screen-viewport {
+  margin: 3px;
+}
+.is-focus .terminal-utility {
+  height: 22px;
+}
+.is-focus .terminal-container {
+  margin: 3px;
+}

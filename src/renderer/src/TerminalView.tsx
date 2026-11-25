@@ -12,11 +12,20 @@ interface Props {
   hostId: string
   sessionId: string
   visible: boolean
+  focusRequest?: number
   demo: boolean
   onStatus: (status: string) => void
 }
 
-export default function TerminalView({ api, hostId, sessionId, visible, demo, onStatus }: Props) {
+export default function TerminalView({
+  api,
+  hostId,
+  sessionId,
+  visible,
+  focusRequest,
+  demo,
+  onStatus
+}: Props) {
   const container = useRef<HTMLDivElement>(null)
   const instance = useRef<{ terminal: Terminal; fit: FitAddon; search: SearchAddon } | null>(null)
   const [searching, setSearching] = useState(false)
@@ -142,7 +151,7 @@ export default function TerminalView({ api, hostId, sessionId, visible, demo, on
         instance.current?.fit.fit()
         instance.current?.terminal.focus()
       })
-  }, [visible])
+  }, [visible, focusRequest])
 
   async function copy(): Promise<void> {
     const text = instance.current?.terminal.getSelection()

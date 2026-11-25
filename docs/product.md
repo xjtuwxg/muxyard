@@ -25,7 +25,7 @@ No forced migration, account creation, remote agent installation, or replacement
 
 ### Current prototype
 
-Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; session tabs and tmux window tabs; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
+Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; compact terminal-first workspaces and focus mode; collapsible machine and pane navigation; session tabs and tmux window tabs; window creation and navigation shortcuts; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
 
 ### Daily-driver milestone
 

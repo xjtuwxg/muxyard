@@ -46,6 +46,14 @@ Classic terminal attachment and standalone pane actions verify current discovery
 
 The window tab bar is derived from stable window IDs in the selected session snapshot and sorted by tmux window index. Selecting a window restores its active pane. New-window commands explicitly target the session and inherit the selected pane's working directory. Next/previous-window commands are scoped to the same session. Workspace shortcuts are handled during key-event capture so terminal widgets do not receive the reserved keystrokes; composing text and form/dialog inputs are excluded. Ctrl+D is deliberately passed through.
 
+## Terminal-first layout
+
+Attached workspaces use compact chrome, with machine navigation and the pane inspector collapsed by default. A single attached session does not need a separate session-tab row. The overview keeps the full management layout. Focus mode hides both side panels and tab rows while retaining a small title strip with an explicit exit action. Machine, inspector, and focus preferences are stored in renderer-local storage; leaving focus mode restores the chosen panels.
+
+Layout toggles change visibility and sizing without remounting terminal components or changing connection IDs. Existing ResizeObservers adjust the PTY or control client. Pane workspace sizing accounts for the actual compact pane-header height. Keyboard shortcuts reveal hidden navigation when needed, while plain Escape and the tmux Ctrl+B prefix remain available to terminal applications.
+
+Desktop tests measure terminal area, check that tmux's actual pane width increases in focus mode, verify a single client remains attached, and send input through that same client after resizing. Both Pane view and Classic terminal are covered.
+
 ## Terminal transport and lifetime
 
 The interactive transport is a real PTY attached to a regular tmux client. Full-screen terminal programs, shell input, and existing tmux bindings pass through xterm.js. Local environment variables `TMUX` and `TMUX_PANE` are removed to avoid tmux's nested-session guard.

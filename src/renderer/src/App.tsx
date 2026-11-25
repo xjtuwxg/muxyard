@@ -28,7 +28,10 @@ import {
   Rows2,
   Unplug,
   X,
-  Trash2
+  Trash2,
+  PanelLeft,
+  PanelRight,
+  Minimize2
 } from 'lucide-react'
 import type { Host, Pane, Snapshot, TmuxAction, TmuxSession } from '../../shared/types'
 import TerminalView from './TerminalView'
@@ -44,6 +47,23 @@ interface Tab {
   session: TmuxSession
   status: string
   attempt: number
+}
+interface TerminalLayout {
+  sidebar: boolean
+  inspector: boolean
+  focus: boolean
+}
+function initialTerminalLayout(): TerminalLayout {
+  try {
+    const saved = JSON.parse(localStorage.getItem('muxyard.terminalLayout') ?? '{}')
+    return {
+      sidebar: saved.sidebar === true,
+      inspector: saved.inspector === true,
+      focus: saved.focus === true
+    }
+  } catch {
+    return { sidebar: false, inspector: false, focus: false }
+  }
 }
 const errorMessage = (error: unknown): string =>
   String(error).replace(/^Error: (Error invoking remote method '[^']+': Error: )?/, '')
@@ -95,6 +115,8 @@ export default function App() {
   const [selectedPanes, setSelectedPanes] = useState<Record<string, string>>({})
   const [modal, setModal] = useState<'host' | 'help' | 'import' | null>(null)
   const [paneMode, setPaneMode] = useState(true)
+  const [layout, setLayout] = useState<TerminalLayout>(initialTerminalLayout)
+  const [focusRequest, setFocusRequest] = useState(0)
   const [paneSelections, setPaneSelections] = useState<
     Record<string, { paneId: string; serial: number }>
   >({})
@@ -108,6 +130,7 @@ export default function App() {
   const searching = useRef<HTMLInputElement>(null)
   const shortcutHandler = useRef<(event: KeyboardEvent) => void>(() => {})
   const activeTab = tabs.find((tab) => tab.key === activeKey)
+  const focusActive = Boolean(activeTab && layout.focus)
   const host = hosts.find((item) => item.id === selectedHost) ?? hosts[0]
   const visibleHosts = hosts.filter(
     (item) =>
@@ -159,6 +182,11 @@ export default function App() {
       .then(setRealHosts)
       .catch((error) => setNotice(errorMessage(error)))
   }, [])
+  useEffect(() => {
+    try {
+      localStorage.setItem('muxyard.terminalLayout', JSON.stringify(layout))
+    } catch {}
+  }, [layout])
 
   const refresh = useCallback(
     async (ids?: string[]) => {
@@ -238,7 +266,8 @@ export default function App() {
       if (event.defaultPrevented) return
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault()
-        searching.current?.focus()
+        setLayout((value) => ({ ...value, focus: false, sidebar: true }))
+        requestAnimationFrame(() => searching.current?.focus())
       }
       if (event.key === 'Escape') {
         setModal(null)
@@ -335,11 +364,39 @@ export default function App() {
     }
   }
 
+  function setFocusMode(enabled: boolean): void {
+    setLayout((value) => ({ ...value, focus: enabled }))
+    setFocusRequest((value) => value + 1)
+  }
+
   shortcutHandler.current = (event) => {
     if (modal || event.isComposing || event.altKey) return
     const target = event.target as HTMLElement | null
     if (target?.closest('input, textarea, [contenteditable="true"]') && !target.closest('.xterm'))
       return
+    if (
+      activeTab &&
+      (event.metaKey || event.ctrlKey) &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 'f'
+    ) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (!event.repeat) setFocusMode(!layout.focus)
+      return
+    }
+    if (activeTab && event.metaKey && !event.ctrlKey && event.key.toLowerCase() === 'b') {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      const panel = event.shiftKey ? 'inspector' : 'sidebar'
+      if (!event.repeat)
+        setLayout((value) => ({
+          ...value,
+          focus: false,
+          [panel]: value.focus ? true : !value[panel]
+        }))
+      return
+    }
     let type: TmuxAction['type'] | undefined
     let direction: 'horizontal' | 'vertical' | undefined
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 't')
@@ -388,7 +445,9 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${activeTab ? 'has-terminal' : ''} ${layout.sidebar ? 'sidebar-visible' : ''} ${layout.inspector ? 'inspector-visible' : ''} ${focusActive ? 'is-focus' : ''}`}
+    >
       <aside className="sidebar">
         <div className="sidebar-title">
           <Brand />
@@ -586,7 +645,10 @@ export default function App() {
         )}
 
         {tabs.length > 0 && (
-          <nav className="tabbar" aria-label="Attached sessions">
+          <nav
+            className={`tabbar ${tabs.length === 1 ? 'single-session' : ''}`}
+            aria-label="Attached sessions"
+          >
             <button
               className={`home-tab ${!activeKey ? 'selected' : ''}`}
               aria-label="Show overview"
@@ -901,9 +963,73 @@ export default function App() {
           </div>
         )}
 
+        {focusActive && activeTab && activeSession && (
+          <div className="focus-toolbar">
+            <span
+              className={`connection-dot ${activeTab.status === 'Attached' || demo ? 'connected' : 'error'}`}
+            />
+            <span className="focus-context">
+              <strong>{activeSession.name}</strong>
+              <span>/</span>
+              {windows.find((item) => item.selected)?.name ?? activeTab.host.name}
+            </span>
+            {demo && <span className="demo-label">DEMO</span>}
+            <div className="focus-actions">
+              <button
+                className="icon-button"
+                aria-label="New tmux window"
+                title="New tmux window (Ctrl+T / ⌘T)"
+                disabled={pending || !activePane}
+                onClick={() =>
+                  activePane && void action(activeTab.host, activeSession, activePane, 'new-window')
+                }
+              >
+                <Plus size={14} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Split"
+                title="Split side by side (⌘D)"
+                disabled={pending || !activePane}
+                onClick={() =>
+                  activePane &&
+                  void action(activeTab.host, activeSession, activePane, 'split', 'horizontal')
+                }
+              >
+                <Columns2 size={14} />
+              </button>
+              <button
+                className="focus-exit-button"
+                aria-label="Exit focus mode"
+                title="Exit focus mode (⌘⇧F / Ctrl+Shift+F)"
+                onClick={() => setFocusMode(false)}
+              >
+                <Minimize2 size={13} /> Exit focus <kbd>⌘⇧F</kbd>
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab && activeSession && (
           <div className="workspace-toolbar">
             <div>
+              <button
+                className="icon-button"
+                aria-label={layout.sidebar ? 'Hide machines' : 'Show machines'}
+                aria-expanded={layout.sidebar}
+                title="Toggle machines (⌘B)"
+                onClick={() => setLayout((value) => ({ ...value, sidebar: !value.sidebar }))}
+              >
+                <PanelLeft size={15} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Back to overview"
+                title="Back to overview"
+                onClick={() => setActiveKey(null)}
+              >
+                <LayoutDashboard size={14} />
+              </button>
               <i
                 className={`connection-dot ${activeTab.status === 'Attached' || demo ? 'connected' : 'error'}`}
               />
@@ -912,6 +1038,23 @@ export default function App() {
               <span className="toolbar-status">{activeTab.status}</span>
             </div>
             <div>
+              <button
+                className="icon-button"
+                aria-label={layout.inspector ? 'Hide pane list' : 'Show pane list'}
+                aria-expanded={layout.inspector}
+                title="Toggle pane list (⌘⇧B)"
+                onClick={() => setLayout((value) => ({ ...value, inspector: !value.inspector }))}
+              >
+                <PanelRight size={15} />
+              </button>
+              <button
+                className="subtle-button focus-mode-button"
+                aria-label="Enter focus mode"
+                title="Focus mode (⌘⇧F / Ctrl+Shift+F)"
+                onClick={() => setFocusMode(true)}
+              >
+                <Maximize2 size={13} /> Focus
+              </button>
               {!demo && (
                 <div className="view-mode-control">
                   <button className={paneMode ? 'selected' : ''} onClick={() => setPaneMode(true)}>
@@ -1037,6 +1180,7 @@ export default function App() {
                   hostId={tab.host.id}
                   session={tab.session}
                   visible={tab.key === activeKey}
+                  focusRequest={focusRequest}
                   selection={paneSelections[tab.key]}
                   onConnection={(id) => {
                     if (id) paneConnections.current.set(tab.key, id)
@@ -1076,6 +1220,7 @@ export default function App() {
                   hostId={tab.host.id}
                   sessionId={tab.session.id}
                   visible={tab.key === activeKey}
+                  focusRequest={focusRequest}
                   demo={demo}
                   onStatus={(status) =>
                     setTabs((value) =>
@@ -1242,6 +1387,14 @@ export default function App() {
                   <div className="shortcut-row">
                     <span>New tmux window</span>
                     <kbd>Ctrl+T / ⌘T</kbd>
+                  </div>
+                  <div className="shortcut-row">
+                    <span>Toggle focus mode</span>
+                    <kbd>⌘⇧F / Ctrl+Shift+F</kbd>
+                  </div>
+                  <div className="shortcut-row">
+                    <span>Toggle machines / pane list</span>
+                    <kbd>⌘B / ⌘⇧B</kbd>
                   </div>
                   <div className="shortcut-row">
                     <span>Next / previous window</span>

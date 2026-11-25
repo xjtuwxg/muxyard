@@ -24,6 +24,7 @@ No account. No cloud relay. No remote Muxyard daemon. Just your Mac, OpenSSH, an
 - Connect to named tmux sockets, including additional local socket profiles.
 - Detach the app's client while keeping the underlying tmux session running.
 - Explore a clearly labeled demo without connecting to a machine.
+- Work in a compact terminal-first layout, with collapsible navigation and a focus mode.
 
 Tmux remains responsible for persistence and process lifetime. Muxyard never migrates an existing agent, restarts its process, or detaches other clients with `attach -d`.
 
@@ -99,15 +100,26 @@ The import button reads literal aliases in the main `~/.ssh/config` file. It ski
 
 Attach an existing session before creating a window. These shortcuts apply to the attached workspace and do not run inside dialogs or text-entry forms:
 
-| Action                          | Shortcut        |
-| ------------------------------- | --------------- |
-| New tmux window                 | Ctrl+T or Cmd+T |
-| Next window                     | Ctrl+Tab        |
-| Previous window                 | Ctrl+Shift+Tab  |
-| Split into left and right panes | Cmd+D           |
-| Split into top and bottom panes | Cmd+Shift+D     |
+| Action                          | Shortcut                    |
+| ------------------------------- | --------------------------- |
+| New tmux window                 | Ctrl+T or Cmd+T             |
+| Next window                     | Ctrl+Tab                    |
+| Previous window                 | Ctrl+Shift+Tab              |
+| Split into left and right panes | Cmd+D                       |
+| Split into top and bottom panes | Cmd+Shift+D                 |
+| Toggle focus mode               | Cmd+Shift+F or Ctrl+Shift+F |
+| Toggle machines sidebar         | Cmd+B                       |
+| Toggle pane list                | Cmd+Shift+B                 |
 
 Plain Ctrl+D continues to reach the terminal program. Pane view also supports the tmux prefix sequences **Ctrl+B c** (new window), **Ctrl+B n/p** (next/previous window), **Ctrl+B %** (left/right split), **Ctrl+B "** (top/bottom split), and **Ctrl+B z** (zoom).
+
+**The terminal gets the workspace.** Attached sessions default to a compact toolbar and window tabs. The machines sidebar and pane inspector start collapsed, the overview header and repeated status/help rows are hidden, and a single attached session does not consume a separate session-tab row. Use the panel buttons or Cmd+B / Cmd+Shift+B to reveal navigation when needed. **Cmd+K** also reveals the machines sidebar and focuses session search.
+
+**Focus mode maximizes terminal space.** Click **Focus** or press Cmd+Shift+F / Ctrl+Shift+F to hide both side panels, session tabs, and window tabs. A thin title strip keeps the current session/window, new-window and split actions, and **Exit focus** accessible. Window and pane shortcuts still work. Exit using the same shortcut or the visible button; plain Escape remains available to terminal programs. Your previous panel choices return when leaving focus mode. Layout preferences are saved locally, and the overview retains its full management interface.
+
+Layout changes resize the existing terminal client rather than reconnecting it. This applies to both Pane view and Classic terminal; underlying tmux processes remain running.
+
+![Focus mode with a real isolated local tmux session](docs/screenshots/focus.png)
 
 **Existing tmux state is shared.** Selecting a window or pane can change what other clients of the same session see. An attached terminal can also affect tmux's layout sizing according to your configuration. Muxyard does not create grouped sessions or change global tmux options.
 
