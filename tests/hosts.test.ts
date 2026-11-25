@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { HostStore } from '../src/main/hosts'
+import { HostStore, importAliases } from '../src/main/hosts'
 
 test('concurrent profile changes persist without losing machines and protect the local profile', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'muxyard-hosts-'))
@@ -29,6 +29,29 @@ test('concurrent profile changes persist without losing machines and protect the
     assert.deepEqual(
       reopened.list().map((host) => host.id),
       ['local', 'lab']
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('SSH import adds only explicitly selected aliases and never imports the whole config implicitly', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'muxyard-import-'))
+  try {
+    const store = new HostStore(join(directory, 'hosts.json'))
+    await store.load()
+    await importAliases(store, [], ['dev', 'offline'])
+    assert.equal(store.list().length, 1)
+    await importAliases(store, ['dev', 'dev'], ['dev', 'offline'])
+    assert.deepEqual(
+      store
+        .list()
+        .filter((host) => host.kind === 'ssh')
+        .map((host) => host.address),
+      ['dev']
+    )
+    await assert.rejects(() =>
+      importAliases(store, ['not-selected-from-config'], ['dev', 'offline'])
     )
   } finally {
     await rm(directory, { recursive: true, force: true })

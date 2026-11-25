@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HostStore, sshAliases } from './hosts'
-import { actionArgs, discover, runTmux } from './tmux'
+import { HostStore, sshAliases, importAliases } from './hosts'
+import { actionArgs, discover, runTmux, validateHost } from './tmux'
+import { PaneConnections } from './panes'
 import { Terminals } from './terminals'
 import type { Host, TmuxAction } from '../shared/types'
 
@@ -20,6 +21,7 @@ process.env.PATH = [
 let window: BrowserWindow | null = null
 let terminals: Terminals
 let hosts: HostStore
+let panes: PaneConnections
 
 function registerIPC(): void {
   const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): void => {
@@ -39,17 +41,23 @@ function registerIPC(): void {
   handle('hosts:list', () => hosts.list())
   handle('hosts:save', (host: Host) => hosts.save(host))
   handle('hosts:remove', (id: string) => hosts.remove(id))
-  handle('hosts:import', async () => {
-    for (const alias of await sshAliases()) {
-      if (hosts.list().some((host) => host.address === alias)) continue
-      await hosts.save({
-        id: `ssh-${crypto.randomUUID()}`,
-        kind: 'ssh',
-        name: alias,
-        address: alias
-      })
+  handle('hosts:candidates', async () =>
+    (await sshAliases()).map((address) => ({
+      address,
+      added: hosts.list().some((host) => host.kind === 'ssh' && host.address === address)
+    }))
+  )
+  handle('hosts:import', async (addresses: string[]) =>
+    importAliases(hosts, addresses, await sshAliases())
+  )
+  handle('hosts:probe', async (address: string) => {
+    const host = validateHost({ id: 'probe', name: 'SSH connection test', kind: 'ssh', address })
+    try {
+      const snapshot = await discover(host)
+      return { reachable: true, sessions: snapshot.sessions.length }
+    } catch (error) {
+      return { reachable: false, sessions: 0, error: String(error).replace(/^Error: /, '') }
     }
-    return hosts.list()
   })
   handle('tmux:discover', (id: string) => discover(hosts.get(id)))
   handle('tmux:action', async (id: string, action: TmuxAction) => {
@@ -81,6 +89,25 @@ function registerIPC(): void {
     }
   )
   handle('terminal:close', (id: string) => terminals.close(id))
+  handle('panes:open', (request: { id: string; hostId: string; sessionId: string }) =>
+    panes.open(request.id, hosts.get(request.hostId), request.sessionId)
+  )
+  handle('panes:capture', (id: string, paneId: string) => panes.get(id).capture(paneId))
+  handle('panes:input', (id: string, paneId: string, data: string) =>
+    panes.get(id).input(paneId, data)
+  )
+  handle('panes:select', (id: string, paneId: string) => panes.get(id).select(paneId))
+  handle('panes:action', (id: string, action: TmuxAction) => panes.get(id).action(action))
+  handle('panes:resize', (id: string, cols: number, rows: number) =>
+    panes.get(id).resize(cols, rows)
+  )
+  handle('panes:close', (id: string) => panes.close(id))
+  ipcMain.on('panes:ack', (event, id: string, bytes: number) => {
+    trusted(event)
+    try {
+      panes.get(id).acknowledge(bytes)
+    } catch {}
+  })
   ipcMain.on('terminal:write', (event, id, data) => {
     trusted(event)
     terminals.write(id, data)
@@ -115,9 +142,13 @@ async function createWindow(): Promise<void> {
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event) => event.preventDefault())
-  window.webContents.on('render-process-gone', () => terminals.closeAll())
+  window.webContents.on('render-process-gone', () => {
+    terminals.closeAll()
+    panes.closeAll()
+  })
   window.on('closed', () => {
     terminals.closeAll()
+    panes.closeAll()
     window = null
   })
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL)
@@ -138,6 +169,9 @@ app
     }
     terminals = new Terminals((event) => {
       if (window && !window.isDestroyed()) window.webContents.send('terminal:event', event)
+    })
+    panes = new PaneConnections((event) => {
+      if (window && !window.isDestroyed()) window.webContents.send('panes:event', event)
     })
     registerIPC()
     Menu.setApplicationMenu(
@@ -171,4 +205,7 @@ app
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
-app.on('before-quit', () => terminals?.closeAll())
+app.on('before-quit', () => {
+  terminals?.closeAll()
+  panes?.closeAll()
+})

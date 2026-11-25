@@ -2,7 +2,7 @@
 
 ## Decision: a desktop app with a web-based interface
 
-Muxyard is a local Electron application. React renders the workspace; xterm.js renders terminal output; the main process uses node-pty to run system `tmux` or `/usr/bin/ssh`.
+Muxyard is a local Electron application. React renders the workspace; xterm.js renders terminal output. Pane view uses a persistent tmux control-mode process over local pipes or OpenSSH. Classic terminal uses node-pty to run a regular tmux client.
 
 A browser-only app cannot directly use macOS OpenSSH, ssh-agent, or PTYs. It would require a local bridge or a server-side gateway. That adds installation and credential-handling complexity to a product whose first job is to attach to the user's existing sessions. A desktop shell provides those capabilities while preserving a reusable UI.
 
@@ -21,6 +21,10 @@ Electron main process
         |
         +-- Metadata and actions: execFile(tmux / ssh)
         |
+        +-- Pane view: tmux -C attach-session over pipes or SSH
+        |           +-- Framed command replies and byte-safe pane output
+        |           +-- One xterm.js surface per tmux pane
+        |
         +-- Interactive terminals: node-pty
                     |
                     +-- local tmux attach-session
@@ -34,9 +38,11 @@ Remote machines require only SSH and tmux. OpenSSH resolves keys, SSH config ali
 
 `tmux list-panes -a -F ...` returns a metadata snapshot. The format includes session IDs, window IDs, pane IDs, commands, paths, and titles. Stable tmux IDs are used for all actions; user-facing session names are never interpolated into shell commands.
 
-The UI refreshes each configured host every eight seconds. A polling cycle does not overlap itself. Errors retain the last successful snapshot with a stale-data indication. Discovery has a 12-second execution timeout and a bounded output buffer. This is intentionally a small implementation; many hosts or high-latency networks will benefit from a persistent control connection.
+SSH import is a preview operation. It reads aliases without saving or probing them. Only explicitly selected aliases are persisted. Optional probes run at most three at a time and select reachable aliases; the main process validates imports against the current alias list.
 
-Before a terminal is opened or a pane action runs, the main process discovers the current state again and verifies the target exists. The initial implementation operates on the original session. It does not forcibly detach other clients. Window selection and pane selection remain shared tmux state.
+Local hosts and successfully connected SSH hosts refresh every eight seconds. Other saved SSH profiles are contacted only when chosen. A failed SSH host stops background polling until an explicit retry. Requests within the same discovery generation are deduplicated; stale results cannot overwrite a newer generation. Errors retain the last successful snapshot with a stale-data indication. Discovery has a 12-second execution timeout and a bounded output buffer.
+
+Classic terminal attachment and standalone pane actions verify current discovery state. Pane-view commands validate targets against their control connection's session membership and use stable IDs. Both views operate on the original session and never forcibly detach other clients. Window selection and pane selection remain shared tmux state.
 
 ## Terminal transport and lifetime
 
@@ -44,7 +50,7 @@ The interactive transport is a real PTY attached to a regular tmux client. Full-
 
 The renderer acknowledges consumed output. The PTY pauses when unacknowledged output exceeds 262,144 JavaScript string characters and resumes below 131,072 characters. This bounds the normal backlog and prevents a fast terminal process from continually outrunning the renderer. Connection count is limited to 12 tabs. Scrollback is capped at 10,000 lines per terminal.
 
-Closing a tab terminates only the local PTY client. Tmux manages the session and its processes. Closing the window or a renderer crash releases all application PTYs. The renderer also closes any terminal that finishes opening after its view has unmounted.
+Closing a tab terminates only its local client process. Tmux manages the session and its processes. Closing the window or a renderer crash releases PTY and control-mode clients. The renderer also closes any connection that finishes opening after its view has unmounted.
 
 ## Security properties
 
@@ -60,17 +66,21 @@ Closing a tab terminates only the local PTY client. Tmux manages the session and
 
 Host profiles are stored in Electron's user-data directory as `hosts.json`, written through a temporary file with owner-only file permissions. The built-in `local` profile is immutable. The development-only `MUXYARD_DATA_DIR` environment variable isolates automated tests.
 
-## Why not tmux control mode immediately?
+## Pane-view control mode
 
-[Tmux control mode](https://github.com/tmux/tmux/wiki/Control-Mode) is the intended path for deep GUI integration. It exposes output events and commands over a text protocol that can run through SSH. It can support GUI-managed pane surfaces and reduce metadata polling.
+[Tmux control mode](https://github.com/tmux/tmux/wiki/Control-Mode) drives the default pane view. A persistent `tmux -C attach-session` process emits live per-pane output, layout changes, active-pane changes, and window changes. Each pane maps to an independent xterm.js instance positioned from tmux's geometry. Input uses hexadecimal bytes addressed to the stable pane ID; clicking and typing do not wait for the selection acknowledgement.
 
-A correct implementation also needs streaming framing, octal byte decoding, command/result correlation, pane history recovery, terminal dimensions, layout synchronization, backpressure, and reconnection. Replacing a real terminal with periodic `capture-pane` snapshots would lose terminal semantics and interactivity. The prototype therefore uses a real attached client first, with GUI actions around it.
+The parser handles fragmented lines, guarded command replies, unsolicited hook blocks, octal byte escapes, and binary output. IPC uses base64 so UTF-8 sequences split across output notifications survive intact. Output acknowledgements pause process stdout above 256 KiB and resume below 128 KiB. Commands have a 12-second timeout and a bounded pending queue. Pane input requests are serialized to preserve paste ordering.
 
-The present UI displays tmux's terminal layout inside one terminal surface. It does not yet render each pane as a separate draggable GUI terminal. That distinction is part of the product's current scope.
+Tmux itself answers terminal device queries from pane applications. Pane renderers consume the corresponding queries without generating a second response; otherwise xterm's synthetic response would be forwarded as input and could corrupt an interactive program. A real terminal-query program in the desktop tests verifies that it receives exactly one cursor-position response.
+
+Initial capture and cursor/mode metadata are requested as one tmux command list, preventing an event-loop turn between them. Streaming output is withheld until this initial screen is emitted, then subsequent output is delivered in order. Up to 1,000 history lines are restored. Resizing or attaching can rebuild a pane's screen; live output is not implemented as repeated capture polling.
+
+The control client's dimensions are updated with `refresh-client -C`. Pane terminal grids use tmux's reported dimensions and scale down to fit their GUI panels. The actual tmux layout and active pane are preserved. Drag resizing, pop-out macOS windows, exact recovery of every terminal mode, and the complete tmux key-table UI remain future work. Classic terminal remains available for full tmux key binding and overlay behavior.
 
 ## Validation boundaries
 
-Unit tests cover metadata parsing, executable recognition, SSH configuration import, argument quoting, destination validation, and concurrent profile persistence. Integration tests use an isolated tmux server to exercise PTY input/output, pane actions, and detach persistence with multiple clients. Electron UI tests cover demo navigation and a real local socket attachment, including against the packaged application.
+Unit tests cover metadata parsing, executable recognition, selective SSH import, argument quoting, destination validation, concurrent profile persistence, protocol framing, octal decoding, and capture ordering. Integration tests use isolated tmux servers to exercise both transports, separate pane streams, input routing, external splits, cursor hydration, zoom, and detach persistence. Electron UI tests cover direct mouse/keyboard focus, Ctrl+B splits, external layout synchronization, view switching, and selective import using simulated SSH outcomes without contacting real SSH hosts.
 
 Real remote servers, SSH jump hosts, non-default user shells, agent wrappers, large output streams, macOS sleep/wake, and long-duration sessions need additional validation before a general release.
 

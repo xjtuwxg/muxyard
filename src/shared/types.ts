@@ -23,6 +23,35 @@ export interface Pane {
   title: string
   dead: boolean
   agent?: AgentKind
+  width?: number
+  height?: number
+  left?: number
+  top?: number
+  cursorX?: number
+  cursorY?: number
+  modes?: string
+  zoomed?: boolean
+}
+
+export interface SSHCandidate {
+  address: string
+  added: boolean
+}
+export interface HostProbe {
+  reachable: boolean
+  sessions: number
+  error?: string
+}
+export interface PaneEvent {
+  id: string
+  paneId?: string
+  data?: string
+  reset?: boolean
+  cols?: number
+  rows?: number
+  session?: TmuxSession
+  error?: string
+  closed?: boolean
 }
 
 export interface TmuxSession {
@@ -54,7 +83,9 @@ export interface DesktopAPI {
     list(): Promise<Host[]>
     save(host: Host): Promise<Host[]>
     remove(id: string): Promise<Host[]>
-    importSSH(): Promise<Host[]>
+    candidates(): Promise<SSHCandidate[]>
+    probe(address: string): Promise<HostProbe>
+    importSSH(addresses: string[]): Promise<Host[]>
   }
   tmux: {
     discover(hostId: string): Promise<Snapshot>
@@ -73,6 +104,17 @@ export interface DesktopAPI {
     acknowledge(id: string, characters: number): void
     close(id: string): Promise<void>
     subscribe(listener: (event: TerminalEvent) => void): () => void
+  }
+  panes: {
+    open(request: { id: string; hostId: string; sessionId: string }): Promise<void>
+    capture(id: string, paneId: string): Promise<void>
+    input(id: string, paneId: string, data: string): Promise<void>
+    select(id: string, paneId: string): Promise<void>
+    action(id: string, action: TmuxAction): Promise<void>
+    resize(id: string, cols: number, rows: number): Promise<void>
+    acknowledge(id: string, bytes: number): void
+    close(id: string): Promise<void>
+    subscribe(listener: (event: PaneEvent) => void): () => void
   }
 }
 

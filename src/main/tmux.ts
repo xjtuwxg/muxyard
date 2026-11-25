@@ -19,7 +19,24 @@ const fields = [
   'pane_current_command',
   'pane_current_path',
   'pane_title',
-  'pane_dead'
+  'pane_dead',
+  'pane_width',
+  'pane_height',
+  'pane_left',
+  'pane_top',
+  'cursor_x',
+  'cursor_y',
+  'cursor_flag',
+  'alternate_on',
+  'keypad_cursor_flag',
+  'mouse_standard_flag',
+  'mouse_button_flag',
+  'mouse_all_flag',
+  'mouse_sgr_flag',
+  'window_zoomed_flag',
+  'wrap_flag',
+  'insert_flag',
+  'keypad_flag'
 ]
 export const PANE_FORMAT = fields.map((field) => `#{${field}}`).join(FIELD)
 
@@ -75,7 +92,7 @@ export function parseSnapshot(output: string): Snapshot {
     if (!row) continue
     const f = row.split(FIELD)
     if (
-      f.length !== fields.length ||
+      (f.length !== fields.length && f.length !== 15) ||
       !/^\$\d+$/.test(f[0]) ||
       !/^@\d+$/.test(f[4]) ||
       !/^%\d+$/.test(f[8])
@@ -104,6 +121,18 @@ export function parseSnapshot(output: string): Snapshot {
       title: f[13],
       dead: f[14] === '1',
       agent: detectAgent(f[11])
+    }
+    if (f.length === fields.length) {
+      Object.assign(pane, {
+        width: Number(f[15]),
+        height: Number(f[16]),
+        left: Number(f[17]),
+        top: Number(f[18]),
+        cursorX: Number(f[19]),
+        cursorY: Number(f[20]),
+        modes: f.slice(21, 28).join('') + f.slice(29, 32).join(''),
+        zoomed: f[28] === '1'
+      })
     }
     sessions.get(f[0])!.panes.push(pane)
   }

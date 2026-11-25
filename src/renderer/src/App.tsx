@@ -32,6 +32,8 @@ import {
 } from 'lucide-react'
 import type { Host, Pane, Snapshot, TmuxAction, TmuxSession } from '../../shared/types'
 import TerminalView from './TerminalView'
+import PaneWorkspace from './PaneWorkspace'
+import SSHImportDialog from './SSHImportDialog'
 import { demoHosts, demoSnapshots } from './demo'
 
 const api = window.muxyard
@@ -91,7 +93,14 @@ export default function App() {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [selectedPanes, setSelectedPanes] = useState<Record<string, string>>({})
-  const [modal, setModal] = useState<'host' | 'help' | null>(null)
+  const [modal, setModal] = useState<'host' | 'help' | 'import' | null>(null)
+  const [paneMode, setPaneMode] = useState(true)
+  const [paneSelections, setPaneSelections] = useState<
+    Record<string, { paneId: string; serial: number }>
+  >({})
+  const paneConnections = useRef(new Map<string, string>())
+  const connectedHosts = useRef(new Set<string>())
+  const inFlight = useRef(new Map<string, Promise<void>>())
   const [notice, setNotice] = useState('')
   const [pending, setPending] = useState(false)
   const [agentFilter, setAgentFilter] = useState(false)
@@ -99,6 +108,11 @@ export default function App() {
   const searching = useRef<HTMLInputElement>(null)
   const activeTab = tabs.find((tab) => tab.key === activeKey)
   const host = hosts.find((item) => item.id === selectedHost) ?? hosts[0]
+  const visibleHosts = hosts.filter(
+    (item) =>
+      item.kind === 'local' || item.id === selectedHost || (snapshots[item.id] && !errors[item.id])
+  )
+  const otherHosts = hosts.filter((item) => !visibleHosts.includes(item))
   const currentSnapshot = snapshots[host.id]
   const currentSessions = currentSnapshot?.sessions ?? []
   const allSessions = hosts.flatMap((host) =>
@@ -133,29 +147,52 @@ export default function App() {
       .catch((error) => setNotice(errorMessage(error)))
   }, [])
 
-  const refresh = useCallback(async () => {
-    if (demo || !api) return
-    const current = generation.current
-    setScanning(true)
-    await Promise.all(
-      hosts.map(async (host) => {
-        try {
-          const snapshot = await api.tmux.discover(host.id)
-          if (generation.current !== current) return
-          setSnapshots((value) => ({ ...value, [host.id]: snapshot }))
-          setErrors((value) => {
-            const next = { ...value }
-            delete next[host.id]
-            return next
+  const refresh = useCallback(
+    async (ids?: string[]) => {
+      if (demo || !api) return
+      const current = generation.current
+      setScanning(true)
+      await Promise.all(
+        hosts
+          .filter((host) =>
+            ids
+              ? ids.includes(host.id)
+              : host.kind === 'local' || connectedHosts.current.has(host.id)
+          )
+          .map(async (host) => {
+            const requestKey = `${current}:${host.id}`
+            const existing = inFlight.current.get(requestKey)
+            if (existing) return existing
+            let request!: Promise<void>
+            request = (async () => {
+              try {
+                const snapshot = await api.tmux.discover(host.id)
+                if (generation.current !== current) return
+                setSnapshots((value) => ({ ...value, [host.id]: snapshot }))
+                connectedHosts.current.add(host.id)
+                setErrors((value) => {
+                  const next = { ...value }
+                  delete next[host.id]
+                  return next
+                })
+              } catch (error) {
+                if (generation.current === current) {
+                  connectedHosts.current.delete(host.id)
+                  setErrors((value) => ({ ...value, [host.id]: errorMessage(error) }))
+                }
+              } finally {
+                if (inFlight.current.get(requestKey) === request)
+                  inFlight.current.delete(requestKey)
+              }
+            })()
+            inFlight.current.set(requestKey, request)
+            return request
           })
-        } catch (error) {
-          if (generation.current === current)
-            setErrors((value) => ({ ...value, [host.id]: errorMessage(error) }))
-        }
-      })
-    )
-    if (generation.current === current) setScanning(false)
-  }, [demo, hosts])
+      )
+      if (generation.current === current) setScanning(false)
+    },
+    [demo, hosts]
+  )
 
   useEffect(() => {
     generation.current += 1
@@ -177,6 +214,10 @@ export default function App() {
       clearInterval(interval)
     }
   }, [refresh, demo])
+
+  useEffect(() => {
+    if (!demo && hosts.some((host) => host.id === selectedHost)) void refresh([selectedHost])
+  }, [selectedHost, hosts, demo, refresh])
 
   useEffect(() => {
     const listener = (event: KeyboardEvent): void => {
@@ -210,6 +251,8 @@ export default function App() {
     setSelectedHost(demo ? 'local' : 'demo-local')
     setSnapshots(demo ? {} : demoSnapshots())
     setDemo(!demo)
+    connectedHosts.current.clear()
+    inFlight.current.clear()
   }
 
   function openSession(host: Host, session: TmuxSession): void {
@@ -246,15 +289,26 @@ export default function App() {
       return
     }
     if (!api) return
+    const key = `${host.id}:${session.id}`
+    if (paneMode && type === 'select') {
+      setPaneSelections((value) => ({
+        ...value,
+        [key]: { paneId: pane.id, serial: (value[key]?.serial ?? 0) + 1 }
+      }))
+      return
+    }
     setPending(true)
     try {
-      await api.tmux.action(
-        host.id,
+      const request: TmuxAction =
         type === 'split'
           ? { type, sessionId: session.id, paneId: pane.id, direction: direction! }
           : { type, sessionId: session.id, paneId: pane.id }
-      )
-      await refresh()
+      const connection = paneMode ? paneConnections.current.get(key) : undefined
+      if (connection) await api.panes.action(connection, request)
+      else {
+        await api.tmux.action(host.id, request)
+        await refresh([host.id])
+      }
     } catch (error) {
       setNotice(errorMessage(error))
     } finally {
@@ -267,27 +321,18 @@ export default function App() {
       setNotice('Exit the demo in the desktop app to import your SSH hosts.')
       return
     }
-    try {
-      const imported = await api.hosts.importSSH()
-      setRealHosts(imported)
-      setNotice(
-        imported.length > realHosts.length
-          ? `Imported ${imported.length - realHosts.length} SSH host(s).`
-          : 'No new literal Host entries found in ~/.ssh/config. You can add any SSH alias manually, including aliases from Include files.'
-      )
-    } catch (error) {
-      setNotice(errorMessage(error))
-    }
+    setModal('import')
   }
 
-  async function removeHost(): Promise<void> {
-    if (!api || demo || host.kind === 'local') return
+  async function removeHost(id = host.id): Promise<void> {
+    if (!api || demo || id === 'local') return
     try {
-      const next = await api.hosts.remove(host.id)
-      setTabs((value) => value.filter((tab) => tab.host.id !== host.id))
-      if (activeTab?.host.id === host.id) setActiveKey(null)
+      const next = await api.hosts.remove(id)
+      setTabs((value) => value.filter((tab) => tab.host.id !== id))
+      if (activeTab?.host.id === id) setActiveKey(null)
       setRealHosts(next)
-      setSelectedHost('local')
+      connectedHosts.current.delete(id)
+      if (selectedHost === id) setSelectedHost('local')
     } catch (error) {
       setNotice(errorMessage(error))
     }
@@ -336,7 +381,7 @@ export default function App() {
           </button>
         </div>
         <div className="host-list">
-          {hosts.map((item) => (
+          {visibleHosts.map((item) => (
             <div className="host-group" key={item.id}>
               <button
                 className={`host-nav ${item.id === selectedHost ? 'selected' : ''}`}
@@ -383,6 +428,42 @@ export default function App() {
               )}
             </div>
           ))}
+          {otherHosts.length > 0 && (
+            <details className="other-machines">
+              <summary>
+                Other machines <span>{otherHosts.length}</span>
+              </summary>
+              {otherHosts.map((item) => (
+                <div className="other-machine-row" key={item.id}>
+                  <button
+                    className="host-nav"
+                    onClick={() => {
+                      setSelectedHost(item.id)
+                      setActiveKey(null)
+                      setFilter('')
+                    }}
+                  >
+                    <Server size={14} />
+                    <span>
+                      {item.name}
+                      <small>
+                        {errors[item.id] ? 'Unavailable · retry on click' : 'Connect on demand'}
+                      </small>
+                    </span>
+                    <i className={`connection-dot ${errors[item.id] ? 'error' : ''}`} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label={`Remove ${item.name}`}
+                    title="Remove saved machine"
+                    onClick={() => void removeHost(item.id)}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </details>
+          )}
         </div>
         <button className="import-button" onClick={() => void importHosts()}>
           <ArrowDownToLine size={14} /> Import SSH config
@@ -508,7 +589,7 @@ export default function App() {
                 </div>
                 <button
                   className="subtle-button refresh-button"
-                  onClick={() => void refresh()}
+                  onClick={() => void refresh([host.id])}
                   disabled={scanning || demo}
                 >
                   <RefreshCw className={scanning ? 'spinning' : ''} size={14} />
@@ -782,6 +863,19 @@ export default function App() {
               <span className="toolbar-status">{activeTab.status}</span>
             </div>
             <div>
+              {!demo && (
+                <div className="view-mode-control">
+                  <button className={paneMode ? 'selected' : ''} onClick={() => setPaneMode(true)}>
+                    Pane view
+                  </button>
+                  <button
+                    className={!paneMode ? 'selected' : ''}
+                    onClick={() => setPaneMode(false)}
+                  >
+                    Classic terminal
+                  </button>
+                </div>
+              )}
               <button
                 className="subtle-button"
                 disabled={pending || !activePane}
@@ -844,23 +938,64 @@ export default function App() {
 
         <div className={`terminal-workspace ${!activeKey ? 'hidden' : ''}`}>
           <div className="terminal-stack">
-            {tabs.map((tab) => (
-              <TerminalView
-                key={`${tab.key}:${tab.attempt}`}
-                api={api}
-                hostId={tab.host.id}
-                sessionId={tab.session.id}
-                visible={tab.key === activeKey}
-                demo={demo}
-                onStatus={(status) =>
-                  setTabs((value) =>
-                    value.map((item) =>
-                      item.key === tab.key && item.status !== status ? { ...item, status } : item
+            {tabs.map((tab) =>
+              paneMode && !demo && api ? (
+                <PaneWorkspace
+                  key={`${tab.key}:${tab.attempt}:panes`}
+                  api={api}
+                  hostId={tab.host.id}
+                  session={tab.session}
+                  visible={tab.key === activeKey}
+                  selection={paneSelections[tab.key]}
+                  onConnection={(id) => {
+                    if (id) paneConnections.current.set(tab.key, id)
+                    else paneConnections.current.delete(tab.key)
+                  }}
+                  onSession={(session) =>
+                    setSnapshots((value) => {
+                      const snapshot = value[tab.host.id] ?? { sessions: [], checkedAt: Date.now() }
+                      return {
+                        ...value,
+                        [tab.host.id]: {
+                          checkedAt: Date.now(),
+                          sessions: snapshot.sessions.some((item) => item.id === session.id)
+                            ? snapshot.sessions.map((item) =>
+                                item.id === session.id ? session : item
+                              )
+                            : [...snapshot.sessions, session]
+                        }
+                      }
+                    })
+                  }
+                  onAction={(pane, type, direction) =>
+                    void action(tab.host, tab.session, pane, type, direction)
+                  }
+                  onStatus={(status) =>
+                    setTabs((value) =>
+                      value.map((item) =>
+                        item.key === tab.key && item.status !== status ? { ...item, status } : item
+                      )
                     )
-                  )
-                }
-              />
-            ))}
+                  }
+                />
+              ) : (
+                <TerminalView
+                  key={`${tab.key}:${tab.attempt}`}
+                  api={api}
+                  hostId={tab.host.id}
+                  sessionId={tab.session.id}
+                  visible={tab.key === activeKey}
+                  demo={demo}
+                  onStatus={(status) =>
+                    setTabs((value) =>
+                      value.map((item) =>
+                        item.key === tab.key && item.status !== status ? { ...item, status } : item
+                      )
+                    )
+                  }
+                />
+              )
+            )}
           </div>
           {activeTab && activeSession && (
             <aside className="pane-inspector">
@@ -927,7 +1062,9 @@ export default function App() {
           </span>
           <span>
             {activeKey
-              ? 'Shift + drag to select text when tmux mouse mode is on'
+              ? paneMode && !demo
+                ? 'Click any pane to focus · Ctrl+B % to split'
+                : 'Shift + drag to select text when tmux mouse mode is on'
               : '⌘ K  Find a session'}
             <i />
             tmux owns your sessions <ShieldCheck size={11} />
@@ -950,7 +1087,18 @@ export default function App() {
             >
               <X size={18} />
             </button>
-            {modal === 'host' ? (
+            {modal === 'import' && api ? (
+              <SSHImportDialog
+                api={api}
+                onImported={(next) => {
+                  setRealHosts(next)
+                  setModal(null)
+                  setNotice(
+                    'Selected machines added. Choose a machine to connect; other saved machines stay quiet.'
+                  )
+                }}
+              />
+            ) : modal === 'host' ? (
               <HostForm
                 demo={demo}
                 onSave={async (value) => {
@@ -984,9 +1132,10 @@ export default function App() {
                   </p>
                   <p>
                     <strong>Mouse-friendly controls.</strong> Click a session to attach, click a
-                    pane to select it, and use the toolbar to split or zoom. Tmux’s own mouse
-                    behavior follows your configuration. Hold Shift while dragging to select
-                    terminal text.
+                    pane to select it, and use the toolbar to split or zoom. Pane view renders
+                    separate clickable terminals without changing your tmux mouse configuration.
+                    Classic terminal keeps all your tmux bindings and overlays. Pane view supports
+                    Ctrl+B %, ", and z; use Classic terminal for other custom prefix bindings.
                   </p>
                   <p>
                     <strong>Shared tmux state.</strong> Selecting a window or pane also affects

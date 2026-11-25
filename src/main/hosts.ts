@@ -77,3 +77,21 @@ export async function sshAliases(): Promise<string[]> {
     throw error
   }
 }
+
+export async function importAliases(
+  store: HostStore,
+  addresses: string[],
+  available: string[]
+): Promise<Host[]> {
+  if (
+    !Array.isArray(addresses) ||
+    addresses.length > 128 ||
+    addresses.some((address) => typeof address !== 'string' || !available.includes(address))
+  )
+    throw new Error('Select SSH aliases from the import list.')
+  for (const address of new Set(addresses)) {
+    if (store.list().some((host) => host.kind === 'ssh' && host.address === address)) continue
+    await store.save({ id: `ssh-${crypto.randomUUID()}`, kind: 'ssh', name: address, address })
+  }
+  return store.list()
+}

@@ -25,7 +25,7 @@ No forced migration, account creation, remote agent installation, or replacement
 
 ### Current prototype
 
-Local and SSH profiles; session discovery; true terminal attachment; tabs; pane selection; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
+Local and SSH profiles; selective SSH import and optional reachability checks; on-demand remote connection; session discovery; classic terminal attachment; persistent control-mode pane surfaces with click-to-focus input; tabs; split and zoom controls; terminal search and selection copying; conservative executable-based agent discovery; a labeled demo; isolated integration tests.
 
 ### Daily-driver milestone
 
@@ -39,8 +39,8 @@ Local and SSH profiles; session discovery; true terminal attachment; tabs; pane 
 
 ### Deeper tmux integration
 
-- Add a persistent tmux control-mode transport alongside terminal attachment.
-- Render panes as individual GUI terminal surfaces with independent selection and scrolling.
+- Extend pane-view compatibility for terminal modes, tmux key tables, and copy/choose overlays.
+- Add detachable macOS windows for individual panes, with deliberate connection ownership and cleanup.
 - Support mouse-driven pane resizing and layouts while retaining the real tmux layout.
 - Evaluate grouped sessions for independent window navigation, with deliberate lifecycle cleanup.
 - Add custom socket paths and deliberate support for creating, renaming, and ending sessions. Destructive actions need clear target labels and confirmations.
@@ -66,4 +66,4 @@ Possible launch title: **“I built a desktop home for the tmux sessions I alrea
 
 Suggested repository topics: `tmux`, `macos`, `ssh`, `terminal`, `desktop`, `coding-agents`, `electron`, `developer-tools`.
 
-Do not publish before real remote SSH validation and a usable installation path exist. Do not claim native Swift rendering, accurate agent task state, or per-pane GUI terminals until they ship.
+Do not publish before real remote SSH validation and a usable installation path exist. Do not claim native Swift rendering, accurate agent task state, complete tmux key-table support in pane view, or detachable macOS pane windows until they ship.

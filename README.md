@@ -14,11 +14,12 @@ No account. No cloud relay. No remote Muxyard daemon. Just your Mac, OpenSSH, an
 
 - Discover existing sessions, windows, and panes on your Mac or an SSH host.
 - Attach multiple sessions in terminal tabs, with full terminal input and output.
+- Display tmux splits as separate GUI terminal panels, with immediate mouse focus and input routed by pane ID.
 - Click to select a window or pane. Split side by side or top and bottom, or toggle pane zoom.
 - Search terminal scrollback with **Cmd+F** and copy selected text with **Cmd+C**.
 - Find sessions with **Cmd+K**.
 - Detect Claude Code, Codex, OpenCode, Gemini, and Aider when tmux reports their executable names.
-- Import literal `Host` aliases from `~/.ssh/config`, or add aliases manually.
+- Preview and selectively import `Host` aliases from `~/.ssh/config`, with optional connection checks.
 - Connect to named tmux sockets, including additional local socket profiles.
 - Detach the app's client while keeping the underlying tmux session running.
 - Explore a clearly labeled demo without connecting to a machine.
@@ -81,7 +82,11 @@ exit
 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes dev-server tmux -V
 ```
 
-In Muxyard, choose **Import SSH config** or **Add machine**, then enter `dev-server`. Key authentication must work without an interactive prompt. New host keys must be verified in Terminal first; Muxyard does not disable host key verification. Key paths, ports, and jump hosts are handled by OpenSSH configuration. Muxyard does not read or store private keys.
+In Muxyard, choose **Import SSH config**, select the aliases you want, and click **Add selected machines**. Nothing is selected or contacted automatically. **Check & select reachable** tests the aliases matching the filter with at most three concurrent attempts, selects successful connections, and leaves failures unchecked. You can also use **Add machine** to enter `dev-server` manually.
+
+Saved SSH machines connect only when chosen. Unused or unavailable machines live in the collapsed **Other machines** list, where they can be retried or removed. Successful connections refresh in the background; a failed connection stops polling until you explicitly choose it or refresh it again.
+
+Key authentication must work without an interactive prompt. New host keys must be verified in Terminal first; Muxyard does not disable host key verification. Key paths, ports, and jump hosts are handled by OpenSSH configuration. Muxyard does not read or store private keys.
 
 Tmux must be available on the remote non-interactive shell's `PATH`. No extra server software is installed. A remote named socket can be selected using the optional socket-name field (equivalent to `tmux -L name`). Custom socket filesystem paths (`-S`) are not supported yet.
 
@@ -91,13 +96,17 @@ The import button reads literal aliases in the main `~/.ssh/config` file. It ski
 
 **Existing tmux state is shared.** Selecting a window or pane can change what other clients of the same session see. An attached terminal can also affect tmux's layout sizing according to your configuration. Muxyard does not create grouped sessions or change global tmux options.
 
-**Tmux owns mouse reporting.** The GUI navigation and toolbar work without enabling tmux mouse mode. Clicking panes inside the terminal follows your existing tmux configuration. To enable tmux's own mouse support, add `set -g mouse on` to your configuration yourself. Hold **Shift** while dragging to select terminal text when mouse reporting is active.
+**Pane view is the default.** Each pane has its own terminal surface, focus outline, scrollback, search, and copy controls. Click directly in a pane to focus it; typing is addressed to that pane without waiting for tmux selection to round-trip over SSH. Existing horizontal and vertical splits, including splits made by another tmux client, are reflected in the GUI. Panels remain inside the same application window; detachable macOS windows are not implemented.
+
+**Choose the right terminal mode.** Pane view uses tmux control mode and supports **Ctrl+B %**, **Ctrl+B "**, and **Ctrl+B z** for split and zoom. It restores the visible screen and up to 1,000 recent history lines at attachment, then streams live application bytes. It does not implement tmux's entire prefix-key table, tmux copy/choose overlays, or every historical terminal mode. Use **Classic terminal** for custom tmux bindings or a TUI that does not render correctly in pane view. Switching views leaves the underlying session running.
+
+**Mouse behavior is local to each view.** Pane view focus works without changing your tmux mouse configuration. Classic terminal follows your existing tmux configuration; use `set -g mouse on` yourself if you want direct pane clicks there. Hold **Shift** while dragging to select terminal text when an application is using mouse reporting.
 
 **Agent discovery is conservative.** `pane_current_command` is used to recognize agent executables. A wrapper reporting `node` or `python` may not be detected. The UI says “Process detected”; it does not claim to know whether an agent is working, finished, or waiting for permission. Agent hooks are a planned integration.
 
 **Disconnects need a reattach.** Network failures leave the server's tmux sessions running under normal tmux configuration. Use **Reattach** after connectivity returns. Automatic reconnect and macOS sleep/wake recovery are planned. User-configured tmux options such as `destroy-unattached` can change session lifetime.
 
-**Cached data can be stale.** Session metadata is refreshed every eight seconds. Failed hosts show their error and explicitly mark cached agent rows as stale.
+**Cached data can be stale.** Connected-host discovery refreshes every eight seconds, while attached pane layouts update from control-mode notifications. Failed hosts retain their last successful snapshot with a stale indication and wait for an explicit retry.
 
 ## Development
 
